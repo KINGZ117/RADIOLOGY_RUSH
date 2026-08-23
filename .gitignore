@@ -1,0 +1,18 @@
+# Python asset pipeline
+.venv/
+__pycache__/
+*.pyc
+
+# Full-resolution generated masters — 190 MB, not needed to run or deploy.
+# Keep them locally; they are the source for anything in media/.
+assets/
+
+# Editor and OS noise
+.DS_Store
+*.bak
+*.swp
+.idea/
+.vscode/
+
+# Local dev server config
+.claude/

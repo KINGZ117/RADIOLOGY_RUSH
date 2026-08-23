@@ -1,0 +1,546 @@
+<title>Radiology Rush Design Bible</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* -- tokens: dark-first, because the game is a dark room with lit screens -- */
+  :root{
+    --ground:#05070e;
+    --surface:#0c1220;
+    --surface-2:#111a2c;
+    --line:rgba(150,190,255,.16);
+    --line-strong:rgba(150,190,255,.34);
+    --ink:#e7eefb;
+    --ink-dim:#93a4c2;
+    --ink-faint:#5f708d;
+    --ct:#3fd8f5;
+    --mri:#b096f8;
+    --xray:#ffb43f;
+    --alarm:#ff6b7d;
+    --good:#4ce6a4;
+    --measure:66ch;
+  }
+  /* the light ground is a cool paper, never cream - the subject is a lit screen */
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --ground:#eef2f8;
+      --surface:#ffffff;
+      --surface-2:#e6ecf6;
+      --line:rgba(20,45,85,.16);
+      --line-strong:rgba(20,45,85,.34);
+      --ink:#0d1626;
+      --ink-dim:#465a7a;
+      --ink-faint:#7286a6;
+      --ct:#0a7d99;
+      --mri:#5f43c4;
+      --xray:#a35c00;
+      --alarm:#c02338;
+      --good:#0d7d55;
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#eef2f8;
+    --surface:#ffffff;
+    --surface-2:#e6ecf6;
+    --line:rgba(20,45,85,.16);
+    --line-strong:rgba(20,45,85,.34);
+    --ink:#0d1626;
+    --ink-dim:#465a7a;
+    --ink-faint:#7286a6;
+    --ct:#0a7d99;
+    --mri:#5f43c4;
+    --xray:#a35c00;
+    --alarm:#c02338;
+    --good:#0d7d55;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);
+    font-family:"Newsreader","Iowan Old Style",Georgia,serif;
+    font-size:19px;line-height:1.62;font-weight:300;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.mono,th{font-family:"Bricolage Grotesque","Avenir Next",system-ui,sans-serif}
+  .mono,.kicker,th,td.num,.spec{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* -- hero: a gantry ring, drawn not decorated -- */
+  .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+  #ring{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .hero-inner{
+    position:relative;max-width:1080px;margin:0 auto;
+    padding:clamp(72px,13vh,150px) clamp(20px,5vw,56px) clamp(52px,9vh,96px);
+  }
+  .kicker{
+    font-size:.66rem;letter-spacing:.34em;text-transform:uppercase;color:var(--ink-dim);
+    margin:0 0 1.4rem;
+  }
+  h1{
+    margin:0;font-weight:800;font-size:clamp(2.6rem,7.4vw,5.2rem);line-height:.94;
+    letter-spacing:-.035em;text-wrap:balance;
+  }
+  h1 .lit{color:var(--ct)}
+  .dek{
+    max-width:44ch;margin:1.4rem 0 0;font-size:clamp(1.05rem,2.1vw,1.3rem);
+    color:var(--ink-dim);font-weight:300;
+  }
+  .stamps{
+    display:flex;flex-wrap:wrap;gap:.5rem;margin-top:2.4rem;
+  }
+  .stamp{
+    font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+    border:1px solid var(--line-strong);border-radius:2px;padding:.44em .8em;color:var(--ink-dim);
+  }
+
+  /* -- page frame -- */
+  .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,56px) 6rem}
+  section{padding-top:clamp(56px,8vh,88px);scroll-margin-top:2rem}
+  .sec-head{display:flex;align-items:baseline;gap:1rem;border-bottom:1px solid var(--line);padding-bottom:.7rem;margin-bottom:2rem}
+  .sec-head h2{margin:0;font-size:clamp(1.35rem,3vw,2rem);font-weight:800;letter-spacing:-.02em}
+  .sec-head .spec{margin-left:auto;font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);white-space:nowrap}
+  p{max-width:var(--measure)}
+  a{color:var(--ct)}
+  strong{font-weight:400;color:var(--ink);background:linear-gradient(transparent 68%,color-mix(in srgb,var(--ct) 28%,transparent) 0)}
+
+  /* -- critique: a chart review, one voice per entry -- */
+  .round{margin-bottom:3rem}
+  .round-label{
+    font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--xray);margin-bottom:1.2rem;
+  }
+  .voice{
+    display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr);gap:.4rem 2.4rem;
+    padding:1.5rem 0;border-top:1px solid var(--line);
+  }
+  .voice .who{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:.95rem;line-height:1.35}
+  .voice .role{display:block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-faint);margin-top:.35rem}
+  .voice blockquote{margin:0;font-style:italic;font-size:1.06rem;color:var(--ink);max-width:var(--measure)}
+  .voice blockquote p{margin:0 0 .8rem}
+  .changed{
+    display:block;margin-top:.9rem;padding-left:1.1rem;border-left:2px solid var(--good);
+    font-style:normal;font-size:.94rem;color:var(--ink-dim);
+  }
+  .changed b{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--good);display:block;margin-bottom:.25rem;font-weight:600}
+
+  /* -- worlds: six weathers of one universe -- */
+  .worlds{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:2rem 0}
+  .world{background:var(--surface);padding:1.3rem 1.25rem 1.4rem}
+  .world .swatch{height:4px;width:44px;margin-bottom:1rem;background:var(--hue)}
+  .world h3{margin:0 0 .2rem;font-size:1.05rem;font-weight:600;letter-spacing:-.01em}
+  .world .spec{display:block;font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--hue);margin-bottom:.7rem}
+  .world p{font-size:.92rem;color:var(--ink-dim);margin:0;max-width:none}
+
+  /* -- tables -- */
+  .scroller{overflow-x:auto;margin:1.6rem 0;border:1px solid var(--line);background:var(--surface)}
+  table{border-collapse:collapse;width:100%;min-width:520px;font-size:.9rem}
+  th{
+    text-align:left;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;font-weight:600;
+    color:var(--ink-dim);padding:.85rem 1.1rem;border-bottom:1px solid var(--line-strong);white-space:nowrap;
+  }
+  td{padding:.8rem 1.1rem;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-dim)}
+  td:first-child{color:var(--ink)}
+  tr:last-child td{border-bottom:0}
+  td.num{font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+
+  /* -- rule lists -- */
+  .rules{list-style:none;padding:0;margin:1.4rem 0;display:grid;gap:.1rem}
+  .rules li{padding:.85rem 0;border-top:1px solid var(--line);max-width:var(--measure)}
+  .rules li:last-child{border-bottom:1px solid var(--line)}
+  .rules b{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:.95rem}
+  .rules span{display:block;color:var(--ink-dim);font-size:.95rem}
+
+  .pull{
+    margin:2.6rem 0;padding:1.6rem 0 1.6rem 1.6rem;border-left:3px solid var(--mri);
+    font-size:clamp(1.15rem,2.6vw,1.5rem);line-height:1.4;max-width:52ch;color:var(--ink);
+  }
+
+  .foot{border-top:1px solid var(--line);margin-top:4rem;padding-top:1.6rem;
+    font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-faint);display:flex;flex-wrap:wrap;gap:.4rem 1.6rem}
+
+  @media (max-width:720px){
+    body{font-size:17px}
+    .voice{grid-template-columns:1fr;gap:.9rem}
+    .sec-head .spec{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #ring{display:none}
+  }
+</style>
+
+<header class="hero">
+  <canvas id="ring" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <p class="kicker">Design bible &#xB7; v1.0 &#xB7; shipped build</p>
+    <h1>Radiology<br><span class="lit">Rush</span></h1>
+    <p class="dek">A match-3 that teaches radiology, built to Pixar warmth and Blizzard
+      polish &#x2014; and argued down to size by six people who each wanted to cut something different.</p>
+    <div class="stamps">
+      <span class="stamp">6 worlds</span>
+      <span class="stamp">30 levels</span>
+      <span class="stamp">3 bosses</span>
+      <span class="stamp">48 case cards</span>
+      <span class="stamp">60 fps target</span>
+      <span class="stamp">no energy meter</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section id="pitch">
+    <div class="sec-head"><h2>The pitch</h2><span class="spec">&#xA7; 01</span></div>
+    <p>You are a first-year resident in a hospital where the imaging departments have become
+      worlds. Match glowing modality gems to run the scanner, clear the artifacts, and read the
+      case before the Rogue Cell does. Every world is a different department with its own light,
+      motion and music. Every level teaches one real idea from radiology, and the game never
+      stops to lecture you &#x2014; the teaching rides on the reward.</p>
+    <p><strong>Session shape:</strong> 90-second levels, three-to-five level sittings, one daily
+      four-minute ritual. <strong>The promise:</strong> you will get faster, and you will actually
+      know the words.</p>
+  </section>
+
+  <section id="critique">
+    <div class="sec-head"><h2>What the team broke</h2><span class="spec">&#xA7; 02 &#xB7; three rounds</span></div>
+    <p>Six people reviewed this before a line of code was written. What survived is everything
+      below; what died is recorded here so it stays dead.</p>
+
+    <div class="round">
+      <p class="round-label">Round one &#x2014; first read</p>
+
+      <div class="voice">
+        <div class="who">Creative Director<span class="role">Cinematics</span></div>
+        <blockquote>
+          <p>&#x201C;Six worlds, six art styles, six music beds is not a world, it's a portfolio. Give me
+            one universe with six weathers. And your hook is the smartest thing here and it's
+            buried &#x2014; the fantasy is <em>becoming a radiologist</em>, not matching gems.&#x201D;</p>
+          <span class="changed"><b>Changed</b>One material language across all six worlds; the
+            residency rank ladder moved onto the title screen and the map header.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">Art Director<span class="role">Environments &amp; UI</span></div>
+        <blockquote>
+          <p>&#x201C;Video behind a match-3 board is the most common way to make a beautiful game
+            unreadable. Every plate ships dark, low-contrast and empty in the middle, or it doesn't
+            ship. And gems can't be six colours &#x2014; 8% of your male players can't tell amber from gold.&#x201D;</p>
+          <span class="changed"><b>Changed</b>Six colours, six silhouettes, six materials. Every
+            plate is composed with a deliberately empty centre.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">Lead Gameplay Engineer<span class="role">Runtime</span></div>
+        <blockquote>
+          <p>&#x201C;Cascades plus particles plus a 1080p video loop plus DOM UI is a frame-rate obituary
+            on a MacBook Air.&#x201D;</p>
+          <span class="changed"><b>Changed</b>Board renders to one canvas, UI stays DOM, particles
+            get a pool and a hard cap, and video gets a kill switch that fires on its own when
+            frame time slips.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">UX &amp; Accessibility Lead<span class="role">Player experience</span></div>
+        <blockquote>
+          <p>&#x201C;Typing mode is the accessibility problem <em>and</em> the accessibility win. Anything
+            timed and text-based excludes people. It has to be optional, forgiving, and never the
+            only path to a reward.&#x201D;</p>
+          <span class="changed"><b>Changed</b>Typing is optional and lossless; the match-3 itself
+            became fully keyboard-playable, which almost nobody does.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">Radiologist<span class="role">Subject-matter expert</span></div>
+        <blockquote>
+          <p>&#x201C;Two things get you laughed out of a reading room: gore, and fake clinical certainty.
+            Don't make the boss a tumour. Make the bosses the things that actually ruin a study &#x2014;
+            motion, metal, and a cell that won't behave.&#x201D;</p>
+          <span class="changed"><b>Changed</b>The three bosses are Motion, Metal and the Rogue Cell.
+            Definitions stay descriptive; nothing in the game diagnoses anything.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">Live Ops<span class="role">Retention</span></div>
+        <blockquote>
+          <p>&#x201C;No energy meter. Your player is a student, not a whale &#x2014; the second you gate their
+            studying behind a timer, they uninstall and feel good about it.&#x201D;</p>
+          <span class="changed"><b>Changed</b>No energy, no session timer, no purchasable anything.
+            Retention comes from knowing more tomorrow than you did today.</span>
+        </blockquote>
+      </div>
+    </div>
+
+    <div class="round">
+      <p class="round-label">Round two &#x2014; after the first revision</p>
+
+      <div class="voice">
+        <div class="who">Creative Director<span class="role">Cinematics</span></div>
+        <blockquote>
+          <p>&#x201C;Your boss fights are health bars with a hat. A boss has to change <em>how</em> I
+            match, not how long I match.&#x201D;</p>
+          <span class="changed"><b>Changed</b>Every boss now rewrites a board rule. The health bar
+            became the timer, not the fight.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">Lead Gameplay Engineer<span class="role">Runtime</span></div>
+        <blockquote>
+          <p>&#x201C;Your combo multiplier climbs forever, so the correct strategy is one giant cascade
+            and nothing else.&#x201D;</p>
+          <span class="changed"><b>Changed</b>The multiplier caps at &#xD7;8 &#x2014; and hitting the cap fires
+            <strong>OVERREAD</strong>: screen lights, audio jumps an octave, next match pays double.
+            The cap became the fireworks.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">UX &amp; Accessibility Lead<span class="role">Player experience</span></div>
+        <blockquote>
+          <p>&#x201C;You put co-op on one keyboard with two simultaneous cursors. That is a fistfight, not
+            a feature.&#x201D;</p>
+          <span class="changed"><b>Changed</b>Co-op became <strong>Double Read</strong>: alternating
+            turns, shared board, shared moves &#x2014; and your combo charges your <em>partner's</em> meter,
+            never your own.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">Radiologist<span class="role">Subject-matter expert</span></div>
+        <blockquote>
+          <p>&#x201C;Typing is where the actual learning lives. Don't bolt it on as a score bonus &#x2014; make it
+            the thing that saves you when the board is bad.&#x201D;</p>
+          <span class="changed"><b>Changed</b>A correct dictation grants +3 moves and a &#xD7;1.5 window.
+            Learning is the strategy, not the tax.</span>
+        </blockquote>
+      </div>
+    </div>
+
+    <div class="round">
+      <p class="round-label">Round three &#x2014; polish</p>
+
+      <div class="voice">
+        <div class="who">Creative Director<span class="role">Cinematics</span></div>
+        <blockquote>
+          <p>&#x201C;The level-complete moment is a number going up. That's the last thing they see before
+            they decide to play again.&#x201D;</p>
+          <span class="changed"><b>Changed</b>Stars punch in on a rising three-note stinger, the case
+            card flips in, and the XP bar fills <em>after</em> the stars &#x2014; never during. Never split
+            the eye.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">Live Ops<span class="role">Retention</span></div>
+        <blockquote>
+          <p>&#x201C;Your daily ritual has no reason to exist on day 30.&#x201D;</p>
+          <span class="changed"><b>Changed</b><strong>Morning Rounds</strong> serves the cards you
+            previously missed, first. The daily gets sharper the longer you play, and the streak is
+            cosmetic &#x2014; it never punishes a missed day.</span>
+        </blockquote>
+      </div>
+
+      <div class="voice">
+        <div class="who">QA Lead<span class="role">Verification</span></div>
+        <blockquote>
+          <p>&#x201C;Cascades during a boss attack during a typing prompt. You will ship that bug.&#x201D;</p>
+          <span class="changed"><b>Changed</b>One explicit state machine &#x2014; idle &#x2192; swap &#x2192; resolve &#x2192;
+            cascade &#x2192; boss &#x2192; prompt &#x2192; idle. Input outside <em>idle</em> is dropped, never queued.</span>
+        </blockquote>
+      </div>
+    </div>
+  </section>
+
+  <section id="art">
+    <div class="sec-head"><h2>Art direction &#x2014; &#x201C;Luminous Anatomy&#x201D;</h2><span class="spec">&#xA7; 03</span></div>
+    <p>One universe, six weathers. Every world is the same hospital seen through a different
+      physics, and five rules hold across all of them.</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Rule</th><th>Specification</th></tr></thead>
+        <tbody>
+          <tr><td>Key light</td><td>One dominant modality colour per world, one warm amber accent &#x2014; always</td></tr>
+          <tr><td>Value structure</td><td>The plate lives in the bottom 35% of the value range; the board owns the top 65%</td></tr>
+          <tr><td>Centre of frame</td><td>Deliberately empty and dark; all detail pushed to the edges</td></tr>
+          <tr><td>Material</td><td>Thick, glossy, subsurface-scattered candy glass with a bevel you could bite</td></tr>
+          <tr><td>Emission budget</td><td>Idle is matte plus one rim. Glow is <em>spent</em> on selection, match, charge and boss beats</td></tr>
+          <tr><td>Motion</td><td>Backgrounds move at &#x2264; 2 px/s of apparent motion. Nothing in the plate crosses frame</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="worlds">
+      <div class="world" style="--hue:#3fd8f5"><div class="swatch"></div><h3>Slice City</h3><span class="spec">Computed tomography</span><p>Concentric gantry rings as a cathedral-city; axial slices floating like glass panes.</p></div>
+      <div class="world" style="--hue:#b096f8"><div class="swatch"></div><h3>Resonance Cathedral</h3><span class="spec">Magnetic resonance</span><p>A gothic bore of superconducting magnets, aurora field lines, helium mist on a mirrored floor.</p></div>
+      <div class="world" style="--hue:#ffb43f"><div class="swatch"></div><h3>Bone Foundry</h3><span class="spec">Radiography</span><p>An industrial forge casting glowing radiographs; hard light shafts, brass, drifting embers.</p></div>
+      <div class="world" style="--hue:#3ff2c8"><div class="swatch"></div><h3>Echo Reef</h3><span class="spec">Ultrasound</span><p>A sonar reef of transducer coral, caustics, and the speckle haze of a live scan.</p></div>
+      <div class="world" style="--hue:#c9f24a"><div class="swatch"></div><h3>Tracer Nebula</h3><span class="spec">Nuclear medicine</span><p>Radiotracer jellyfish drifting through a decay nebula, detector rings in slow orbit.</p></div>
+      <div class="world" style="--hue:#ff6b7d"><div class="swatch"></div><h3>The Reading Room</h3><span class="spec">Diagnostic reading</span><p>A wall of monitors, a crimson alert sweep, and everything you have learned so far.</p></div>
+    </div>
+
+    <p>The six gems are separated three ways at once &#x2014; colour, silhouette, and material &#x2014; so the
+      board still reads with the colour channel removed.</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Gem</th><th>Silhouette</th><th>Material</th><th>Colourblind glyph</th></tr></thead>
+        <tbody>
+          <tr><td>CT slice</td><td>Hexagon</td><td>Cold glass</td><td class="num">&#x2B22;</td></tr>
+          <tr><td>MRI coil</td><td>Rounded diamond</td><td>Copper in violet resin</td><td class="num">&#x25C6;</td></tr>
+          <tr><td>X-ray plate</td><td>Brass-framed square</td><td>Warm film</td><td class="num">&#x25A0;</td></tr>
+          <tr><td>Ultrasound probe</td><td>Teardrop</td><td>Soft plastic and glass</td><td class="num">&#x25B2;</td></tr>
+          <tr><td>Radiotracer</td><td>Sphere</td><td>Glowing liquid</td><td class="num">&#x25CF;</td></tr>
+          <tr><td>Contrast vial</td><td>Bottle</td><td>Silver and fluid</td><td class="num">&#x271A;</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="pull">Squash on land. Anticipation before a special fires. Columns land 40 ms apart so
+      a cascade reads left to right. And the boss reacts to your combo even when it isn't his turn.</p>
+  </section>
+
+  <section id="teaching">
+    <div class="sec-head"><h2>How it actually teaches</h2><span class="spec">&#xA7; 04</span></div>
+    <ul class="rules">
+      <li><b>Ambient.</b><span>Every gem, world and enemy is a real concept, used correctly. You learn the vocabulary by handling it for hours.</span></li>
+      <li><b>Case Cards.</b><span>One card per level &#x2014; term, plain-language definition, real example &#x2014; awarded at the peak of the win moment, not in a menu.</span></li>
+      <li><b>Dictation.</b><span>A definition appears; you type the term. Correct pays +3 moves and a &#xD7;1.5 window. Wrong costs nothing at all.</span></li>
+      <li><b>Spaced repetition, hidden.</b><span>Every card tracks seen and missed counts. Morning Rounds serves missed cards first. The player experiences a daily that gets more relevant; underneath it is a Leitner box.</span></li>
+      <li><b>Clinical red lines.</b><span>No gore, no anatomy beyond organs and scanners, no diagnostic claims. The game teaches language and physics &#x2014; never practice.</span></li>
+    </ul>
+  </section>
+
+  <section id="systems">
+    <div class="sec-head"><h2>Systems</h2><span class="spec">&#xA7; 05</span></div>
+    <p>Eight-by-eight board, adjacent swap, match three or more. Moves are the currency &#x2014;
+      nothing in the default game is timed. Cascades pay a multiplier that climbs per chain link
+      and stops at &#xD7;8.</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Made by</th><th>Piece</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Match 4 in a line</td><td>Collimator Beam</td><td>Clears the full row or column</td></tr>
+          <tr><td>Match 5 in an L or T</td><td>Contrast Bolus</td><td>3&#xD7;3 blast</td></tr>
+          <tr><td>Match 5 in a line</td><td>Recon Core</td><td>Clears every gem of one modality</td></tr>
+          <tr><td>Beam + Beam</td><td>&#x2014;</td><td>Full cross</td></tr>
+          <tr><td>Core + anything</td><td>&#x2014;</td><td>Detonates every copy, then their effects</td></tr>
+          <tr><td>Core + Core</td><td>&#x2014;</td><td>Clears the board</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The three bosses each rewrite a rule rather than adding health, and damage only lands when
+      you match the weakness modality, which is always on screen.</p>
+
+    <ul class="rules">
+      <li><b>The Rogue Cell</b><span>Infects a tile every three moves. Infected tiles can't be matched until a neighbouring match cleans them. <em>Teaches: keep the field clean.</em></span></li>
+      <li><b>The Motion Artifact</b><span>Blurs a 3&#xD7;3 into unmatchable ghosting; only a special piece cuts through. <em>Teaches: save your specials.</em></span></li>
+      <li><b>The Implant Golem</b><span>Armors tiles in chrome &#x2014; two hits each. <em>Teaches: plan two moves deep.</em></span></li>
+      <li><b>Critical Read</b><span>At 50% and 20% health the boss staggers and a dictation opens. With typing off, the stagger becomes a free double-damage window instead. Never a dead end.</span></li>
+    </ul>
+  </section>
+
+  <section id="perf">
+    <div class="sec-head"><h2>Performance targets</h2><span class="spec">&#xA7; 06 &#xB7; verified in build</span></div>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Target</th><th>Budget</th></tr></thead>
+        <tbody>
+          <tr><td>Frame rate</td><td class="num">60 fps on an M1 Air at 1440&#xD7;900 &#xB7; 30 fps floor on integrated graphics</td></tr>
+          <tr><td>Frame budget</td><td class="num">16.6 ms &#x2014; board &#x2264; 4 ms, particles &#x2264; 3 ms, UI &#x2264; 2 ms</td></tr>
+          <tr><td>Measured simulation + render</td><td class="num">0.23 ms/frame under a 130-particle load</td></tr>
+          <tr><td>Input latency</td><td class="num">&#x2264; 50 ms from click to tile response</td></tr>
+          <tr><td>Particles</td><td class="num">Pooled, hard cap 420 &#x2014; oldest recycled, never allocated mid-frame</td></tr>
+          <tr><td>Adaptive quality</td><td class="num">&gt; 22 ms thins particles &#xB7; &gt; 28 ms for 2 s pauses video, still art takes over</td></tr>
+          <tr><td>Audio</td><td class="num">100% synthesised at runtime &#x2014; zero downloads, zero latency</td></tr>
+          <tr><td>Rendering split</td><td class="num">Board = one DPR-aware canvas &#xB7; HUD and menus = DOM</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="access">
+    <div class="sec-head"><h2>Accessibility &amp; retention</h2><span class="spec">&#xA7; 07 &#xB7; ship-blocking</span></div>
+    <ul class="rules">
+      <li><b>Full keyboard play.</b><span>Arrows move the cursor, space picks and swaps, Esc cancels &#x2014; the whole game, not just the menus.</span></li>
+      <li><b>Colourblind glyphs and high contrast.</b><span>A shape badge on every gem; high contrast dims the plate to 25% and lifts tile contrast.</span></li>
+      <li><b>Reduced motion.</b><span>Honours the system setting automatically: no shake, fewer particles, shorter animations. Nothing flashes above 3 Hz.</span></li>
+      <li><b>Readable by choice.</b><span>Text scaling to 130%, a heavier-letterform toggle, and aria-live announcements for score, moves, objective and boss state.</span></li>
+      <li><b>No dark patterns.</b><span>No energy meter, no session timer, nothing purchasable, and a streak that is cosmetic. The only reason to come back is that tomorrow's Morning Rounds is built from what you got wrong.</span></li>
+    </ul>
+  </section>
+
+  <section id="polish">
+    <div class="sec-head"><h2>Polish pass</h2><span class="spec">&#xA7; 07b &#xB7; round two</span></div>
+    <p>The first build was correct. It was not yet exciting. Six things changed, in this order.</p>
+    <ul class="rules">
+      <li><b>The tutorial.</b><span>Eight beats on a live board &#x2014; welcome, your goal, moves-not-clocks, <em>make this exact swap</em>, chains, power-ups, your kit, go. It spotlights one element at a time, speaks each beat, and during the swap step the board refuses every move except the one being taught. Skippable, replayable, and it never explains two things at once.</span></li>
+      <li><b>Combo escalation.</b><span>A named call at every link: NICE, CRYSTAL CLEAR SCAN, CLEAN READ, DIAGNOSIS UNLOCKED, TEXTBOOK, SPECTACULAR READ, OVERREAD &#x2014; each with its own banner tier, screen kick, flash and voice line. And <strong>SURGE</strong>: from the third link the board detonates a free 3&#xD7;3 burst of its own, so long chains physically snowball instead of merely counting higher.</span></li>
+      <li><b>Music that layers with the streak.</b><span>Four synthesised layers &#x2014; bass and kick, hats, the hook, counter-melody and claps &#x2014; entering and leaving <em>only on the bar line</em>, driven by how deep your chain goes. Every world has its own key, mode and tempo.</span></li>
+      <li><b>A voice cast.</b><span>The attending calls your reads; Marco the CT tech, Nurse Rosa and Dr. Kim the resident pop in on big chains with a quick celebration. Every line is captioned on screen, so the entire layer is optional and nothing is lost with sound off.</span></li>
+      <li><b>The reward, staged.</b><span>Stars punch in on the stinger; <em>then</em> the case card turns over &#x2014; a real 3D flip from a holo-foil back with a gold seal, gloss sweeping across the face; and only then does the XP bar fill. Three stars gilds the card.</span></li>
+      <li><b>iPhone.</b><span>Flick-to-swap at a third of a tile, 44pt minimum targets, safe-area insets, no rubber-band scroll, no zoom-on-focus, audio unlocked on first touch &#x2014; and haptics where the platform allows them. iOS Safari exposes no web vibration API, so the toggle is honest about doing nothing there.</span></li>
+    </ul>
+    <p class="pull">A chain used to be a number going up. Now it is a call, a kick, a burst the board fires by itself, and a nurse leaning in to tell you it was clean.</p>
+  </section>
+
+  <div class="foot">
+    <span>Radiology Rush</span>
+    <span>Design bible v1.0</span>
+    <span>Art &amp; loops generated for this build</span>
+    <span>Audio synthesised at runtime</span>
+  </div>
+</div>
+
+<script>
+  // The hero ring: a gantry, drawn rather than decorated. Cheap, ambient, pausable.
+  (function () {
+    var c = document.getElementById('ring');
+    if (!c || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var x = c.getContext('2d'), dpr = Math.min(window.devicePixelRatio || 1, 2), t = 0, raf;
+
+    function size() {
+      var b = c.getBoundingClientRect();
+      c.width = Math.max(1, b.width * dpr);
+      c.height = Math.max(1, b.height * dpr);
+    }
+    function hue() {
+      return getComputedStyle(document.documentElement).getPropertyValue('--ct').trim() || '#3fd8f5';
+    }
+    function draw() {
+      raf = requestAnimationFrame(draw);
+      t += 0.0016;
+      var w = c.width, h = c.height, cx = w * 0.78, cy = h * 0.44;
+      var r0 = Math.min(w, h) * 0.42;
+      x.clearRect(0, 0, w, h);
+      x.globalCompositeOperation = 'lighter';
+      for (var i = 0; i < 5; i++) {
+        var r = r0 * (0.52 + i * 0.16);
+        var a = t * (i % 2 ? -1 : 1) * (0.6 + i * 0.12);
+        x.beginPath();
+        x.arc(cx, cy, r, a, a + Math.PI * (1.1 - i * 0.12));
+        x.strokeStyle = hue();
+        x.globalAlpha = 0.05 + (4 - i) * 0.022;
+        x.lineWidth = (i === 2 ? 2.5 : 1.2) * dpr;
+        x.stroke();
+      }
+      x.globalAlpha = 1;
+      x.globalCompositeOperation = 'source-over';
+    }
+    size();
+    window.addEventListener('resize', size);
+    draw();
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) cancelAnimationFrame(raf); else draw();
+    });
+  })();
+</script>

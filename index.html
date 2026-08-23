@@ -1,0 +1,210 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Radiology Rush">
+<meta name="theme-color" content="#05070d">
+<meta http-equiv="cache-control" content="no-cache">
+<meta name="format-detection" content="telephone=no">
+<title>Radiology Rush</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="media/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="media/icons/favicon-32.png">
+<meta name="description" content="A match-3 that teaches radiology. Seven departments, 35 levels, three bosses, and a case-card album that quietly works as spaced repetition.">
+<link rel="stylesheet" href="css/style.css?v=202608231809">
+
+<div id="app" class="boot">
+
+  <!-- ambient plate: video loop with the key-art still always behind it as fallback -->
+  <div id="plate">
+    <img id="plate-still" alt="">
+    <video id="plate-a" muted playsinline preload="auto"></video>
+    <video id="plate-b" muted playsinline preload="auto"></video>
+    <div id="plate-veil"></div>
+  </div>
+
+  <!-- ───────────────────────── title ───────────────────────── -->
+  <section id="screen-title" class="screen active">
+    <div class="title-wrap">
+      <p class="eyebrow">Anthropic&nbsp;·&nbsp;Luminous Anatomy</p>
+      <h1 class="logo"><span>Radiology</span><em>Rush</em></h1>
+      <p class="tagline">Match the modality. Clear the artifact. Read the case.</p>
+      <div class="title-buttons">
+        <button class="btn primary" id="btn-play">Play</button>
+        <button class="btn" id="btn-coop">Co-op · Double Read</button>
+        <button class="btn" id="btn-daily">Morning Rounds</button>
+        <button class="btn ghost" id="btn-glossary">Case Cards</button>
+        <button class="btn ghost" id="btn-settings">Settings</button>
+      </div>
+      <p class="rankline" id="title-rank"></p>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── world map ───────────────────────── -->
+  <section id="screen-map" class="screen">
+    <header class="topbar">
+      <button class="btn tiny" data-nav="title">‹ Menu</button>
+      <div class="rank-chip" id="map-rank"></div>
+      <div class="star-chip" id="map-stars"></div>
+    </header>
+    <div class="map-scroll" id="map-scroll"></div>
+  </section>
+
+  <!-- ───────────────────────── level ───────────────────────── -->
+  <section id="screen-game" class="screen">
+    <header class="hud">
+      <button class="btn tiny" id="btn-quit">‹ Map</button>
+      <div class="hud-objective">
+        <span class="hud-label" id="hud-world"></span>
+        <span class="hud-value" id="hud-objective"></span>
+        <div class="hud-progress"><i id="hud-progress-bar"></i></div>
+      </div>
+      <div class="hud-stat"><span class="hud-label">Moves</span><span class="hud-value big" id="hud-moves">0</span></div>
+      <div class="hud-stat"><span class="hud-label">Score</span><span class="hud-value big" id="hud-score">0</span></div>
+      <div class="hud-stat combo" id="hud-combo-wrap"><span class="hud-label">Combo</span><span class="hud-value big" id="hud-combo">×1</span><div class="heat"><i id="hud-heat"></i></div></div>
+    </header>
+
+    <div id="boss-bar" hidden>
+      <img id="boss-portrait" alt="">
+      <div class="boss-meta">
+        <div class="boss-name"><span id="boss-name"></span><em id="boss-weak"></em></div>
+        <div class="boss-hp"><i id="boss-hp-fill"></i></div>
+        <div class="boss-rule" id="boss-rule"></div>
+      </div>
+    </div>
+
+    <div id="coop-bar" hidden>
+      <div class="coop-player p1"><span>Player 1</span><div class="meter"><i id="coop-m1"></i></div></div>
+      <div class="coop-turn" id="coop-turn">Player 1's read</div>
+      <div class="coop-player p2"><span>Player 2</span><div class="meter"><i id="coop-m2"></i></div></div>
+    </div>
+
+    <div id="board-wrap">
+      <canvas id="board" width="720" height="720" role="application"
+              aria-label="Match board. Arrow keys move the cursor, space selects and swaps."></canvas>
+      <div id="board-banner"></div>
+    </div>
+
+    <footer class="boosters">
+      <button class="booster" id="bst-shuffle" title="Contrast Injection — reshuffle the board"><b>⟳</b><span>Injection</span><i id="bst-shuffle-n">0</i></button>
+      <button class="booster" id="bst-beam" title="Windowing — turn any tile into a Collimator Beam"><b>≡</b><span>Windowing</span><i id="bst-beam-n">0</i></button>
+      <button class="booster" id="bst-moves" title="Second Read — add three moves"><b>+3</b><span>Second Read</span><i id="bst-moves-n">0</i></button>
+      <button class="booster wide" id="bst-dictate" title="Open a dictation prompt for extra moves"><b>⌨</b><span>Dictate</span></button>
+    </footer>
+  </section>
+
+  <!-- ───────────────────────── celebration cast ───────────────────────── -->
+  <div id="cast" aria-live="polite">
+    <img id="cast-img" alt="">
+    <div id="cast-bubble"></div>
+  </div>
+
+  <!-- ───────────────────────── tutorial ───────────────────────── -->
+  <div id="tutorial" hidden>
+    <div id="tut-hole"></div>
+    <div id="tut-card">
+      <p class="tut-step" id="tut-step"></p>
+      <p class="tut-text" id="tut-text"></p>
+      <div class="tut-row">
+        <button class="btn tiny ghost" id="tut-skip">Skip tutorial</button>
+        <button class="btn tiny primary" id="tut-next">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── dictation prompt ───────────────────────── -->
+  <div id="dictation" class="overlay" hidden>
+    <div class="card dictation-card">
+      <p class="eyebrow" id="dict-kicker">Dictation</p>
+      <p class="dict-def" id="dict-def"></p>
+      <input id="dict-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+             aria-label="Type the radiology term this definition describes" placeholder="type the term…">
+      <div class="dict-row">
+        <span class="dict-hint" id="dict-hint"></span>
+        <div>
+          <button class="btn tiny ghost" id="dict-skip">Skip</button>
+          <button class="btn tiny primary" id="dict-go">Read it</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── result ───────────────────────── -->
+  <section id="screen-result" class="screen">
+    <div class="card result-card">
+      <p class="eyebrow" id="result-kicker">Level complete</p>
+      <h2 id="result-title">Slice City 1</h2>
+      <div class="stars" id="result-stars"><i></i><i></i><i></i></div>
+      <p class="result-score"><span id="result-score">0</span><small>points</small></p>
+      <div class="case-flip" id="result-case">
+        <div class="case-inner" id="case-inner">
+          <div class="case-face case-back">
+            <img class="case-seal" src="media/chars/seal.png" alt="">
+            <span class="case-back-label">Case card</span>
+          </div>
+          <div class="case-face case-front">
+            <p class="case-kicker">Case card earned</p>
+            <h3 id="case-term"></h3>
+            <p id="case-def"></p>
+            <p class="case-example" id="case-example"></p>
+            <i class="case-gloss"></i>
+          </div>
+        </div>
+      </div>
+      <div class="xp-row"><div class="xp-bar"><i id="result-xp"></i></div><span id="result-rank"></span></div>
+      <div class="result-buttons">
+        <button class="btn ghost" id="result-map">Map</button>
+        <button class="btn" id="result-retry">Replay</button>
+        <button class="btn primary" id="result-next">Next level</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── case cards ───────────────────────── -->
+  <section id="screen-glossary" class="screen">
+    <header class="topbar">
+      <button class="btn tiny" data-nav="title">‹ Menu</button>
+      <h2 class="screen-title">Case Cards</h2>
+      <div class="rank-chip" id="glossary-count"></div>
+    </header>
+    <div class="glossary-grid" id="glossary-grid"></div>
+  </section>
+
+  <!-- ───────────────────────── settings ───────────────────────── -->
+  <section id="screen-settings" class="screen">
+    <header class="topbar">
+      <button class="btn tiny" data-nav="title">‹ Menu</button>
+      <h2 class="screen-title">Settings</h2>
+      <div class="rank-chip" id="fps-chip">—</div>
+    </header>
+    <div class="settings-grid">
+      <label class="switch"><input type="checkbox" id="set-typing"><span></span><b>Typing mode</b><small>Dictation prompts grant moves and a ×1.5 window. Optional, always.</small></label>
+      <label class="switch"><input type="checkbox" id="set-video"><span></span><b>Video plates</b><small>Living backgrounds. Turns itself off automatically if frames start to slip.</small></label>
+      <label class="switch"><input type="checkbox" id="set-glyphs"><span></span><b>Colourblind glyphs</b><small>Adds a shape badge to every gem: ⬢ ◆ ■ ▲ ● ✚</small></label>
+      <label class="switch"><input type="checkbox" id="set-contrast"><span></span><b>High contrast</b><small>Dims the plate to 25% and lifts tile contrast.</small></label>
+      <label class="switch"><input type="checkbox" id="set-motion"><span></span><b>Reduced motion</b><small>No shake, fewer particles, shorter animations.</small></label>
+      <label class="switch"><input type="checkbox" id="set-sound"><span></span><b>Sound effects</b><small></small></label>
+      <label class="switch"><input type="checkbox" id="set-music"><span></span><b>Music</b><small>A four-layer track per world. Layers arrive as your combo streak climbs.</small></label>
+      <label class="switch"><input type="checkbox" id="set-voice"><span></span><b>Voice calls</b><small>The attending and the crew call your reads. Captions show either way.</small></label>
+      <label class="switch"><input type="checkbox" id="set-ambience"><span></span><b>Room tone</b><small>The quiet hospital bed under everything — air, a distant monitor, scanner hum.</small></label>
+      <label class="switch"><input type="checkbox" id="set-haptics"><span></span><b>Haptics</b><small>Vibration on matches and rewards, where the device supports it.</small></label>
+      <label class="switch"><input type="checkbox" id="set-dys"><span></span><b>Readable font</b><small>Heavier, wider letterforms for long reading.</small></label>
+      <label class="range"><b>Text size</b><input type="range" id="set-text" min="90" max="130" step="5"><small id="set-text-val">100%</small></label>
+      <div class="danger">
+        <button class="btn tiny" id="set-tutorial">Replay tutorial</button>
+        <button class="btn tiny ghost" id="set-reset">Erase all progress</button>
+      </div>
+    </div>
+  </section>
+
+  <button id="sound-nudge" hidden>Tap for sound</button>
+  <div id="toast" aria-live="polite"></div>
+  <div id="sr" class="sr-only" aria-live="polite"></div>
+</div>
+
+<script src="js/plate.js?v=202608231809"></script>
+<script src="js/data.js?v=202608231809"></script>
+<script src="js/engine.js?v=202608231809"></script>
+<script src="js/audio.js?v=202608231809"></script>
+<script src="js/fx.js?v=202608231809"></script>
+<script src="js/game.js?v=202608231809"></script>
