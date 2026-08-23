@@ -44,10 +44,20 @@ combos charge *your partner's* meter, not your own.
 
 ## The noise it makes
 
-- **Music is four layers, and your streak decides how many play.** Bass and kick
-  always; hats arrive on your second chain link, the hook on the fourth, the
-  counter-melody and claps when you're on fire. Layers only ever change on the bar
-  line, so it stays musical. Every world has its own key and tempo.
+Everything you hear is synthesised on your device — there is not one audio file in
+the game except the voice lines.
+
+- **A cinematic electronic score, four layers deep, and your streak decides how
+  many play.** Sidechained bass and kick always; hats and percussion arrive on your
+  second chain link, the plucked hook on the fourth, supersaw pads and the
+  counter-lead when you're on fire. Layers only ever change on the bar line, so it
+  stays musical. Every department has its own key, tempo and drum feel — and the
+  level number nudges both, so no two levels sound identical.
+- **The boss has his own track**: faster, distorted, half-time drums, a minor
+  second in the motif. **Winning has its own cue** — a rising IV–V–I with the lead
+  over the top.
+- **Room tone.** Under everything: air, a 60 Hz hum, and a distant monitor that
+  beeps on no predictable schedule. Switch it off in Settings.
 - **Voice calls.** The attending calls your reads — *"Crystal clear scan."*,
   *"Diagnosis unlocked!"*, *"Overread! Outstanding."* — and on a big chain one of the
   crew pops in to celebrate: Marco the CT tech, Nurse Rosa, or Dr. Kim the resident.
@@ -67,18 +77,25 @@ combos charge *your partner's* meter, not your own.
   is affected.
 - Add it to your home screen for a full-screen, browser-chrome-free run.
 
+## Deploying it
+
+See [DEPLOY.md](DEPLOY.md). Short version: it is a static site, `netlify.toml` is
+already written, and the whole payload is 8.5 MB.
+
 ## What is in here
 
 ```
 index.html                  the shell
 css/style.css               UI skin (the board is canvas; everything else is DOM)
+js/plate.js                 two video elements, crossfaded — seamless loops from any clip
 js/data.js                  gems, worlds, 30 levels, the 48-term deck
 js/engine.js                pure board logic — matches, specials, gravity, hazards
 js/audio.js                 all sound synthesised at runtime (no audio files)
 js/fx.js                    pooled particles, shake, floating text
 js/game.js                  screens, level runtime, bosses, dictation, save
-media/plates/               world key art (also the poster fallback for video)
-media/loops/                the six ambient video loops
+media/plates/               section key art (also the poster fallback for video)
+media/loops/                eight background loops — menu plus seven departments
+media/icons/                home-screen and favicon set
 media/sprites/              gem, power-up and boss cutouts
 assets/                     the full-resolution masters everything was cut from
 DESIGN-BIBLE.md             art direction, the AAA critique rounds, targets

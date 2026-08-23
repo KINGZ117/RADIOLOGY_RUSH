@@ -278,6 +278,34 @@ things, in this order:
    haptics where the platform allows them (Android yes; iOS Safari exposes no web
    vibration API, so the toggle is honest about doing nothing there).
 
+## 7c. Production pass
+
+**The score was rewritten.** The first pass was a pleasant chiptune; it did not
+carry a boss fight. What ships now is a cinematic electronic engine: sidechained
+bass ducking under every kick, five-voice supersaw pads, plucked arps through a
+dotted-eighth feedback delay, a convolution room on a send, risers into every
+eighth bar and an impact when they land. Seven department scores, each with its own
+key, tempo, drum pattern and motif; the level number nudges tempo and transposes
+the key, so no two of the 35 levels sound the same. The boss gets a faster,
+waveshaped, minor-second variant. Victory is a written cue, not a jingle.
+
+**Why it is synthesised rather than generated.** The asset service's music and
+sound-effect models are restricted to its own game pipeline and refuse standalone
+use. Procedural also wins on merit here: zero download, zero licensing, and layers
+that can genuinely follow the player's combo streak bar by bar, which a rendered
+stem cannot.
+
+**Seamless loops, solved in code.** Any generated clip has a seam. `js/plate.js`
+runs two video elements and crossfades 0.7 s before the end, driven by a 200 ms
+watchdog rather than media events — which throttle in background tabs and lie on
+iOS. The result loops invisibly whatever the source does.
+
+**An eighth section.** The Angio Suite (cardiac cath lab) joins as world six,
+pushing the Reading Room to seven and the ladder to 35 levels.
+
+**Weight.** 28 MB of video became 2.3 MB at 1280×720 CRF 30 — a fifteen-fold cut
+with no visible loss on a plate that sits dimmed behind a board. Total deploy: 8.5 MB.
+
 ## 8. Asset manifest (all generated for this build)
 
 - 6 world key-art plates (2752×1536) + 6 five-second ambient video loops
