@@ -3,6 +3,11 @@
 **Live: https://radiology-rush.netlify.app**
 Admin: https://app.netlify.com/projects/radiology-rush · Repo: `KINGZ117/RADIOLOGY_RUSH`
 
+## Installing it on a phone
+
+Safari → **Share** → **Add to Home Screen** → **Add**. The game also shows these steps
+itself, once, on the title screen when it detects iOS Safari outside standalone mode.
+
 ## Publishing an update
 
 Double-click **`Publish update.command`**. It pushes to GitHub *and* publishes to

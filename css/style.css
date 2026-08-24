@@ -637,3 +637,31 @@ body.reduced #board-wrap.zoned::after{animation:none;opacity:.25}
   box-shadow:0 0 12px rgba(255,207,106,.6);
   transition:width .25s ease-out;
 }
+
+/* ── Add to Home Screen prompt ── */
+#install-hint{
+  position:relative;max-width:440px;margin:1.6rem auto 0;text-align:left;
+  border:1px solid var(--line);border-radius:18px;background:var(--glass-2);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  padding:1rem 1.1rem;box-shadow:var(--shadow);
+}
+#install-hint[hidden]{display:none}
+#install-close{
+  position:absolute;top:.4rem;right:.5rem;width:32px;height:32px;border:0;border-radius:50%;
+  background:transparent;color:var(--ink-dim);font-size:1.2rem;line-height:1;cursor:pointer;
+}
+#install-close:hover{color:var(--ink);background:rgba(255,255,255,.08)}
+.ih-title{margin:0 0 .35rem;font-weight:800;font-size:.95rem;color:var(--accent)}
+.ih-steps{margin:0;font-size:.86rem;line-height:1.5;color:var(--ink-dim)}
+.ih-steps b{color:var(--ink)}
+.ih-icon{
+  display:inline-block;padding:0 .35em;border:1px solid var(--line);border-radius:5px;
+  color:var(--accent);font-size:.8em;
+}
+.how-card{
+  border:1px solid var(--line);border-radius:16px;background:var(--glass);
+  padding:.9rem 1.1rem;display:grid;gap:.25rem;
+}
+.how-card b{font-size:.96rem}
+.how-card small{color:var(--ink-dim);font-size:.82rem;line-height:1.5}
+.how-card small b{color:var(--ink)}

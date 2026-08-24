@@ -65,6 +65,23 @@ the game except the voice lines.
 - **Chains snowball on purpose.** From the third link the scanner overdrives and
   detonates a burst of its own, so a good chain visibly runs away with itself.
 
+## Put it on your iPhone (and keep your progress)
+
+1. Open **https://radiology-rush.netlify.app** in **Safari** on the iPhone.
+2. Tap **Share** (the square with the arrow, at the bottom).
+3. Scroll down and tap **Add to Home Screen**, then **Add**.
+4. Launch it from the new icon. It runs full screen with no browser bars.
+
+Progress is saved **on the device**, in that app. Close it whenever you like — the
+title screen then shows **Continue**, which drops you back into the exact level *and
+the exact board* you left, with your score and remaining moves intact. Stars, case
+cards, mastery and boosters all persist the same way.
+
+Two things that will wipe it, so you know: clearing Safari's website data, and iOS
+itself clearing storage for a site you have not opened in a long time (adding it to
+the Home Screen makes that far less likely). There are no accounts, so progress does
+not follow you to another device.
+
 ## On an iPhone
 
 - **Flick to swap** — a third of a tile in any direction is enough; no need to land on

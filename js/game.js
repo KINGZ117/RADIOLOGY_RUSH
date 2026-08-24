@@ -9,6 +9,7 @@
   /* ═══════════════════════ save ═══════════════════════ */
   var DEFAULTS = {
     xp: 0, stars: {}, cards: {}, streak: { date: '', count: 0 }, seenTutorial: false,
+    inProgress: null, lastLevel: 1, installDismissed: false,
     boosters: { shuffle: 2, beam: 1, moves: 2, hammer: 2, row: 1, colour: 1 },
     settings: {
       typing: true, video: true, glyphs: false, contrast: false,
@@ -23,7 +24,8 @@
     var out = JSON.parse(JSON.stringify(DEFAULTS));
     Object.keys(out).forEach(function (k) {
       if (s[k] == null) return;
-      if (typeof out[k] === 'object' && !Array.isArray(out[k])) {
+      // a default of null (inProgress) is taken wholesale — merging into null throws
+      if (out[k] !== null && typeof out[k] === 'object' && !Array.isArray(out[k])) {
         Object.keys(out[k]).forEach(function (k2) { if (s[k][k2] != null) out[k][k2] = s[k][k2]; });
         if (k === 'stars' || k === 'cards') out[k] = s[k];
       } else out[k] = s[k];
@@ -31,15 +33,90 @@
     return out;
   }
   var save = load();
+  /* ── saving ────────────────────────────────────────────────────────────
+     The old version debounced every write by 120 ms with no flush on exit, so
+     closing the tab (or swiping the app away on a phone) threw away whatever
+     had just happened. Now: debounce for chatty callers, but always flush on
+     the way out, and never fail silently. */
+  var saveBroken = false;
+
+  function writeSave() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+      saveBroken = false;
+      return true;
+    } catch (e) {
+      if (!saveBroken) {
+        saveBroken = true;
+        toast('This browser is blocking saved progress — check Private Browsing.');
+      }
+      return false;
+    }
+  }
+
   var persist = (function () {
     var t = null;
     return function () {
       clearTimeout(t);
-      t = setTimeout(function () {
-        try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
-      }, 120);
+      t = setTimeout(writeSave, 120);
     };
   })();
+
+  /** Write right now. Used whenever the page might be about to disappear. */
+  function flushSave() {
+    snapshotLevel();
+    return writeSave();
+  }
+  RR.flushSave = flushSave;
+
+  /** Freeze the level in progress so it can be resumed exactly. */
+  function snapshotLevel() {
+    if (!L || L.over || (typeof TUT !== 'undefined' && TUT.on)) { save.inProgress = null; return; }
+    var grid = [];
+    for (var r = 0; r < RR.SIZE; r++) {
+      var row = [];
+      for (var c = 0; c < RR.SIZE; c++) {
+        var cell = L.board.grid[r][c];
+        row.push([cell.gem, cell.special || 0, cell.dir === 'v' ? 1 : 0,
+          cell.fog ? 1 : 0, cell.blur ? 1 : 0, cell.infected ? 1 : 0, cell.armor || 0, cell.file ? 1 : 0]);
+      }
+      grid.push(row);
+    }
+    save.inProgress = {
+      n: L.n, score: L.score, moves: L.moves, grid: grid,
+      collected: L.collected, fog: L.fogCleared, files: L.filesDelivered,
+      coop: L.coop.on, daily: L.daily,
+      boss: L.boss ? { hp: L.boss.hp, weak: L.boss.weak, movesSince: L.boss.movesSince,
+        weakSince: L.boss.weakSince, staggered: L.staggered } : null
+    };
+  }
+
+  /** Put a snapshot back on the board. */
+  function restoreLevel(snap) {
+    if (!snap || !L) return;
+    for (var r = 0; r < RR.SIZE; r++) for (var c = 0; c < RR.SIZE; c++) {
+      var v = snap.grid[r][c], cell = L.board.grid[r][c];
+      cell.gem = v[0];
+      cell.special = v[1] || null;
+      cell.dir = v[2] ? 'v' : 'h';
+      cell.fog = !!v[3]; cell.blur = !!v[4]; cell.infected = !!v[5];
+      cell.armor = v[6] || 0; cell.file = !!v[7];
+    }
+    L.score = snap.score; L.moves = snap.moves;
+    L.collected = snap.collected || {};
+    L.fogCleared = snap.fog || 0;
+    L.filesDelivered = snap.files || 0;
+    if (L.boss && snap.boss) {
+      L.boss.hp = snap.boss.hp;
+      L.boss.weak = snap.boss.weak;
+      L.boss.movesSince = snap.boss.movesSince || 0;
+      L.boss.weakSince = snap.boss.weakSince || 0;
+      L.staggered = snap.boss.staggered || {};
+    }
+    shownScore = snap.score;
+    syncHUD();
+    toast('Picked up where you left off — level ' + snap.n + ', ' + snap.moves + ' moves left.');
+  }
 
   /* ═══════════════════════ assets ═══════════════════════ */
   var sprites = {}, spriteCache = {};
@@ -324,6 +401,16 @@
   RR.badges = badges;
 
   function refreshTitle() {
+    var btn = $('btn-continue');
+    if (btn) {
+      var resumable = save.inProgress || (save.lastLevel && save.lastLevel > 1);
+      btn.hidden = !resumable;
+      if (resumable) {
+        var n = save.inProgress ? save.inProgress.n : save.lastLevel;
+        var w = RR.WORLDS[RR.LEVELS[n - 1].world - 1];
+        btn.textContent = (save.inProgress ? 'Resume level ' + n : 'Continue · Level ' + n) + ' — ' + w.name;
+      }
+    }
     var rank = RR.rankFor(save.xp);
     $('title-rank').textContent = rank.name + ' · ' + totalStars() + ' stars · ' +
       Object.keys(save.cards).length + '/' + RR.TERMS.length + ' case cards' +
@@ -475,7 +562,7 @@
       for (var c = 0; c < RR.SIZE; c++) L.view[r][c] = { dx: 0, dy: 0, sc: 1 };
     }
 
-    if (def.type === 'fog') seedFog(def.target + 10);   // more fog than the goal needs, so it stays reachable
+    if (def.type === 'fog' && !opts.resume) seedFog(def.target + 10);   // more fog than the goal needs
     if (def.type === 'boss') {
       var b = RR.BOSSES[def.boss];
       L.boss = {
@@ -491,6 +578,7 @@
       $('boss-name').textContent = L.boss.def.name;
       $('boss-rule').textContent = L.boss.def.rule;
     }
+    if (opts.resume) restoreLevel(opts.resume);
     startWorldMusic(world, L);
     if (save.settings.ambience) A.startAmbience();
     show('game');
@@ -1626,7 +1714,9 @@
       }
     }
     if (win && stars === 3) save.boosters[['shuffle', 'beam', 'moves'][L.n % 3]]++;
-    persist();
+    save.inProgress = null;
+    save.lastLevel = win ? Math.min(RR.LEVELS.length, L.n + 1) : L.n;
+    writeSave();                                   // a finished level is never debounced
 
     // fill the result card
     $('result-kicker').textContent = win ? (L.def.type === 'boss' ? 'Boss defeated' : 'Level complete') : 'Out of moves';
@@ -1697,6 +1787,12 @@
 
   function wire() {
     $('btn-play').addEventListener('click', function () { coopPending = false; A.ui(); show('map'); });
+    $('btn-continue').addEventListener('click', function () {
+      A.ui();
+      coopPending = false;
+      if (save.inProgress) startLevel(save.inProgress.n, { resume: save.inProgress, coop: false });
+      else startLevel(save.lastLevel || 1, { coop: false });
+    });
     $('btn-coop').addEventListener('click', function () {
       coopPending = true; A.ui(); show('map');
       toast('Co-op · Double Read: pick a level. Players alternate turns and charge each other.');
@@ -1707,7 +1803,10 @@
     document.querySelectorAll('[data-nav]').forEach(function (b) {
       b.addEventListener('click', function () { A.nav(true); show(b.dataset.nav); });
     });
-    $('btn-quit').addEventListener('click', function () { A.stopMusic(); L = null; show('map'); });
+    $('btn-quit').addEventListener('click', function () {
+      flushSave();                       // keep the half-played board
+      A.stopMusic(); L = null; show('map');
+    });
 
     $('result-map').addEventListener('click', function () { A.ui(); show('map'); });
     $('result-retry').addEventListener('click', function () { A.ui(); startLevel(L.n, { coop: L.coop.on }); });
@@ -1777,6 +1876,16 @@
       $('sound-nudge').hidden = A.isRunning();
     });
     window.addEventListener('pageshow', function () { A.rewake(); RR.plate.resume(); });
+
+    /* Every route out of the page writes the save first. pagehide is the one iOS
+       actually delivers when you swipe the app away; the rest are belt and braces. */
+    window.addEventListener('pagehide', flushSave);
+    window.addEventListener('beforeunload', flushSave);
+    window.addEventListener('blur', flushSave);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flushSave();
+    });
+    setInterval(function () { if (L && !L.over) flushSave(); }, 15000);
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible') RR.plate.resume(); else RR.plate.suspend();
     });
@@ -1797,13 +1906,39 @@
     });
   };
 
+  /* ── Add to Home Screen ────────────────────────────────────────────── */
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function isStandalone() {
+    return window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches;
+  }
+  function maybeOfferInstall() {
+    var card = $('install-hint');
+    if (!card) return;
+    card.hidden = !(isIOS() && !isStandalone() && !save.installDismissed);
+  }
+  RR.installState = function () {
+    return { ios: isIOS(), standalone: isStandalone(), dismissed: !!save.installDismissed };
+  };
+  RR.showInstallHint = function () { $('install-hint').hidden = false; };
+
   /* ── boot ────────────────────────────────────────────────── */
   function init() {
     bindSettings();
     applySettings();
     wire();
-    setPlate(MENU_WORLD);
+    setPlate(MENU_WORLD, 0);
     refreshTitle();
+    maybeOfferInstall();
+    $('install-close').addEventListener('click', function () {
+      save.installDismissed = true; writeSave();
+      $('install-hint').hidden = true;
+      A.nav(true);
+    });
     loadSprites(function () {
       document.getElementById('app').classList.remove('boot');
       fitCanvas();

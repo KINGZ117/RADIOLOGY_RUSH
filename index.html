@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="media/icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="media/icons/favicon-32.png">
 <meta name="description" content="A match-3 that teaches radiology. Seven departments, 35 levels, three bosses, and a case-card album that quietly works as spaced repetition.">
-<link rel="stylesheet" href="css/style.css?v=202608241548">
+<link rel="stylesheet" href="css/style.css?v=20260824182756">
 
 <div id="app" class="boot">
 
@@ -30,6 +30,7 @@
       <h1 class="logo"><span>Radiology</span><em>Rush</em></h1>
       <p class="tagline">Match the modality. Clear the artifact. Read the case.</p>
       <div class="title-buttons">
+        <button class="btn primary" id="btn-continue" hidden>Continue</button>
         <button class="btn primary" id="btn-play">Play</button>
         <button class="btn" id="btn-coop">Co-op · Double Read</button>
         <button class="btn" id="btn-daily">Morning Rounds</button>
@@ -37,6 +38,16 @@
         <button class="btn ghost" id="btn-settings">Settings</button>
       </div>
       <p class="rankline" id="title-rank"></p>
+
+      <div id="install-hint" hidden>
+        <button id="install-close" aria-label="Dismiss">×</button>
+        <p class="ih-title">Put it on your Home Screen</p>
+        <p class="ih-steps">
+          Tap <b>Share</b> <span class="ih-icon">&#x2191;</span> at the bottom of Safari, scroll to
+          <b>Add to Home Screen</b>, then <b>Add</b>. It opens full screen, and your stars,
+          case cards and half-played level are all still there.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -194,6 +205,12 @@
       <label class="switch"><input type="checkbox" id="set-haptics"><span></span><b>Haptics</b><small>Vibration on matches and rewards, where the device supports it.</small></label>
       <label class="switch"><input type="checkbox" id="set-dys"><span></span><b>Readable font</b><small>Heavier, wider letterforms for long reading.</small></label>
       <label class="range"><b>Text size</b><input type="range" id="set-text" min="90" max="130" step="5"><small id="set-text-val">100%</small></label>
+      <div class="how-card">
+        <b>Keep it on your phone</b>
+        <small>In Safari: <b>Share</b> → <b>Add to Home Screen</b> → <b>Add</b>. It runs full
+        screen with no browser bars, and progress is saved on the device — close it whenever
+        and <b>Continue</b> picks up the exact level and board you left.</small>
+      </div>
       <div class="danger">
         <button class="btn tiny" id="set-tutorial">Replay tutorial</button>
         <button class="btn tiny ghost" id="set-reset">Erase all progress</button>
@@ -206,9 +223,9 @@
   <div id="sr" class="sr-only" aria-live="polite"></div>
 </div>
 
-<script src="js/plate.js?v=202608241548"></script>
-<script src="js/data.js?v=202608241548"></script>
-<script src="js/engine.js?v=202608241548"></script>
-<script src="js/audio.js?v=202608241548"></script>
-<script src="js/fx.js?v=202608241548"></script>
-<script src="js/game.js?v=202608241548"></script>
+<script src="js/plate.js?v=20260824182756"></script>
+<script src="js/data.js?v=20260824182756"></script>
+<script src="js/engine.js?v=20260824182756"></script>
+<script src="js/audio.js?v=20260824182756"></script>
+<script src="js/fx.js?v=20260824182756"></script>
+<script src="js/game.js?v=20260824182756"></script>
