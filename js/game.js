@@ -9,7 +9,7 @@
   /* ═══════════════════════ save ═══════════════════════ */
   var DEFAULTS = {
     xp: 0, stars: {}, cards: {}, streak: { date: '', count: 0 }, seenTutorial: false,
-    boosters: { shuffle: 2, beam: 1, moves: 2 },
+    boosters: { shuffle: 2, beam: 1, moves: 2, hammer: 2, row: 1, colour: 1 },
     settings: {
       typing: true, video: true, glyphs: false, contrast: false,
       motion: false, sound: true, music: true, voice: true, ambience: true,
@@ -128,7 +128,7 @@
   var MENU_WORLD = { key: 'menu', plate: 'plate-menu.jpg', loop: 'menu.mp4', accent: '#3fd8f5' };
 
   function show(name) {
-    if (name !== 'game' && name !== 'result') setPlate(MENU_WORLD);
+    if (name !== 'game' && name !== 'result') setPlate(MENU_WORLD, 0);
     if (name !== 'game' && A.isRunning && A.isRunning()) {
       if (save.settings.ambience) A.startAmbience();
     }
@@ -141,9 +141,36 @@
     if (name === 'title') refreshTitle();
   }
 
-  function setPlate(world) {
+  /* Each level gets its own light: a hue shift, a brightness lift and a coloured
+     wash, derived from the level number so all 35 look distinct. */
+  function applyLevelLook(n, world) {
+    var root = document.documentElement.style;
+    if (!n) {                                   // menus: the plate as shot
+      root.setProperty('--plate-hue', '0deg');
+      root.setProperty('--plate-bright', '1.34');
+      root.setProperty('--plate-sat', '1.28');
+      root.setProperty('--level-wash', 'transparent');
+      root.setProperty('--accent', world.accent);
+      return;
+    }
+    var i = (n - 1) % 5;                        // position within its world
+    var hue = [-16, -7, 0, 9, 18][i];
+    var bright = [1.42, 1.3, 1.5, 1.36, 1.46][i];
+    var sat = [1.34, 1.5, 1.22, 1.42, 1.3][i];
+    var washes = [
+      'rgba(63,216,245,.20)', 'rgba(176,150,248,.20)', 'rgba(255,180,63,.18)',
+      'rgba(63,242,200,.18)', 'rgba(255,95,138,.17)'
+    ];
+    root.setProperty('--plate-hue', hue + 'deg');
+    root.setProperty('--plate-bright', String(bright));
+    root.setProperty('--plate-sat', String(sat));
+    root.setProperty('--level-wash', washes[i]);
+    root.setProperty('--accent', world.accent);
+  }
+
+  function setPlate(world, lvlN) {
     current.world = world;
-    document.documentElement.style.setProperty('--accent', world.accent);
+    applyLevelLook(lvlN, world);
     RR.plate.setEnabled(!!save.settings.video);
     RR.plate.set('media/plates/' + world.plate, 'media/loops/' + world.loop);
   }
@@ -215,7 +242,63 @@
     if (!worldUnlocked(w)) return false;
     return starsFor(l.n - 1) > 0 || l.n === (l.world - 1) * 5 + 1;
   }
-  function cardState(i) { return save.cards[i] || (save.cards[i] = { seen: 0, missed: 0, at: 0 }); }
+  function cardState(i) {
+    var st = save.cards[i] || (save.cards[i] = { seen: 0, missed: 0, at: 0 });
+    if (st.correct == null) st.correct = 0;
+    return st;
+  }
+
+  var MASTERY = [
+    { at: 0, name: 'Collected', tint: '#93a4c2' },
+    { at: 2, name: 'Bronze',    tint: '#c8873f' },
+    { at: 4, name: 'Silver',    tint: '#c9d6e8' },
+    { at: 7, name: 'Gold',      tint: '#ffcf6a' }
+  ];
+  function masteryOf(i) {
+    var st = save.cards[i];
+    if (!st) return -1;
+    var lvl = 0;
+    for (var k = 0; k < MASTERY.length; k++) if ((st.correct || 0) >= MASTERY[k].at) lvl = k;
+    return lvl;
+  }
+
+  /** Every card you push up a tier pays a booster — learning is the loot table. */
+  function creditLearning(i, correct) {
+    var st = cardState(i);
+    var before = masteryOf(i);
+    st.at = Date.now();
+    if (correct) { st.seen++; st.correct++; } else { st.missed++; }
+    var after = masteryOf(i);
+    if (after > before) {
+      var tier = MASTERY[after];
+      var prize = ['hammer', 'row', 'colour', 'shuffle', 'beam', 'moves'][after % 6];
+      save.boosters[prize]++;
+      save.xp += 150 * after;
+      toast('“' + RR.TERMS[i].word + '” is ' + tier.name + ' now — ' + prize + ' booster earned.');
+      A.star(Math.min(2, after - 1));
+      FX.text(canvas.width / 2, canvas.height * 0.3, tier.name.toUpperCase() + ' · ' + RR.TERMS[i].word,
+        tier.tint, { size: 26 });
+      buzz([24, 50, 24]);
+      cheer();
+    }
+    persist();
+    return after;
+  }
+
+  /** Specialty badges: five mastered terms in a field earns it. */
+  function badges() {
+    var by = {};
+    RR.TERMS.forEach(function (t, i) {
+      var field = t.specialty.split(' ')[0];
+      by[field] = by[field] || { total: 0, mastered: 0 };
+      by[field].total++;
+      if (masteryOf(i) >= 1) by[field].mastered++;
+    });
+    return Object.keys(by).map(function (k) {
+      return { field: k, mastered: by[k].mastered, total: by[k].total, earned: by[k].mastered >= 5 };
+    }).sort(function (a, b) { return b.mastered - a.mastered; });
+  }
+  RR.badges = badges;
 
   function refreshTitle() {
     var rank = RR.rankFor(save.xp);
@@ -259,20 +342,41 @@
   function renderGlossary() {
     var host = $('glossary-grid');
     host.innerHTML = '';
-    var owned = 0;
+
+    // the badge shelf sits above the cards — the reason to keep answering
+    var shelf = document.createElement('div');
+    shelf.className = 'badge-shelf';
+    badges().forEach(function (b) {
+      var pct = Math.round(b.mastered / b.total * 100);
+      shelf.innerHTML += '<div class="badge' + (b.earned ? ' earned' : '') + '">' +
+        '<b>' + b.field + '</b>' +
+        '<div class="badge-bar"><i style="width:' + pct + '%"></i></div>' +
+        '<small>' + b.mastered + '/' + b.total + ' mastered' + (b.earned ? ' · earned' : '') + '</small>' +
+        '</div>';
+    });
+    host.appendChild(shelf);
+
+    var owned = 0, mastered = 0;
     RR.TERMS.forEach(function (t, i) {
       var st = save.cards[i];
       if (st) owned++;
+      var m = masteryOf(i);
+      if (m >= 1) mastered++;
+      var tier = m >= 0 ? MASTERY[m] : null;
       var el = document.createElement('div');
-      el.className = 'gcard' + (st ? '' : ' locked');
-      el.innerHTML = '<span class="spec">' + t.specialty + '</span>' +
+      el.className = 'gcard' + (st ? '' : ' locked') + (m >= 1 ? ' m' + m : '');
+      el.innerHTML =
+        '<span class="spec">' + t.specialty + '</span>' +
+        (tier ? '<span class="tier" style="color:' + tier.tint + '">' + tier.name + '</span>' : '') +
         '<h4>' + (st ? t.word : '— — —') + '</h4>' +
         '<p>' + (st ? t.definition : 'Play the level that teaches this card to unlock it.') + '</p>' +
         (st ? '<p class="case-example">' + t.example + '</p>' +
-          '<div class="seen">seen ' + st.seen + '× · missed ' + st.missed + '×</div>' : '');
+          '<div class="seen">correct ' + (st.correct || 0) + '× · missed ' + st.missed + '×' +
+          (m < 3 ? ' · ' + Math.max(0, MASTERY[m + 1].at - (st.correct || 0)) + ' to ' + MASTERY[m + 1].name : '') +
+          '</div>' : '');
       host.appendChild(el);
     });
-    $('glossary-count').textContent = owned + ' / ' + RR.TERMS.length + ' collected';
+    $('glossary-count').textContent = owned + ' / ' + RR.TERMS.length + ' collected · ' + mastered + ' mastered';
   }
 
   /* ═══════════════════════ daily: Morning Rounds ═══════════════════════ */
@@ -324,7 +428,7 @@
     var def = RR.LEVELS[n - 1];
     if (!def) return;
     var world = RR.WORLDS[def.world - 1];
-    setPlate(world);
+    setPlate(world, n);
     FX.clear();
     shownScore = 0;
 
@@ -334,6 +438,7 @@
       moves: def.moves, score: 0, chain: 0, mult: 1, bonusMoves: 0, bonusWindow: 0,
       phase: 'idle', sel: null, cursor: { r: 4, c: 4 }, armed: null,
       collected: {}, fogCleared: 0, filesDelivered: 0,
+      sinceEvent: 0, eventMult: 1, eventMoves: 0, pendingBlast: null,
       dying: [], anim: 0, animDur: 0, next: null,
       view: [], daily: !!opts.daily, deck: opts.deck || null,
       coop: opts.coop ? { on: true, turn: 1, m1: 0, m2: 0 } : { on: false },
@@ -415,7 +520,7 @@
     $('hud-heat').style.width = (heat * 100) + '%';
     $('hud-combo-wrap').classList.toggle('hot', heat >= 0.5);
     $('hud-progress-bar').style.width = Math.min(100, goalProgress() * 100) + '%';
-    ['shuffle', 'beam', 'moves'].forEach(function (k) {
+    ['shuffle', 'beam', 'moves', 'hammer', 'row', 'colour'].forEach(function (k) {
       $('bst-' + k + '-n').textContent = save.boosters[k];
       $('bst-' + k).disabled = save.boosters[k] <= 0 || L.phase !== 'idle';
     });
@@ -460,7 +565,7 @@
       A.deny();
       var v = view(r, c);
       v.dx = (c2 - c) * 8; v.dy = (r2 - r) * 8;
-      L.phase = 'unswap'; L.anim = 0; L.animDur = 0.16; L.next = { r: r, c: c, r2: r2, c2: c2 };
+      L.phase = 'unswap'; L.anim = 0; L.animDur = 0.10; L.next = { r: r, c: c, r2: r2, c2: c2 };
       return;
     }
     A.swap();
@@ -469,7 +574,7 @@
     a.dx = (c2 - c) * TILE; a.dy = (r2 - r) * TILE;
     b.dx = (c - c2) * TILE; b.dy = (r - r2) * TILE;
     L.sel = null;
-    L.phase = 'swap'; L.anim = 0; L.animDur = 0.16;
+    L.phase = 'swap'; L.anim = 0; L.animDur = 0.10;
     L.next = { r: r, c: c, r2: r2, c2: c2 };
   }
 
@@ -492,6 +597,22 @@
         if (A1.special === 'beam' && B1.special === 'beam') {
           for (var i = 0; i < RR.SIZE; i++) { cells.push([s.r, i]); cells.push([i, s.c]); }
         }
+        // beam + bolus widens the beam to three lanes
+        if ((A1.special === 'beam' && B1.special === 'bolus') ||
+            (A1.special === 'bolus' && B1.special === 'beam')) {
+          var dir = (A1.special === 'beam' ? A1.dir : B1.dir);
+          for (var k = 0; k < RR.SIZE; k++) for (var off = -1; off <= 1; off++) {
+            if (dir === 'h') cells.push([s.r + off, k]); else cells.push([k, s.c + off]);
+          }
+          banner('WIDE BEAM', 3);
+        }
+        // bolus + bolus is a five-wide detonation
+        if (A1.special === 'bolus' && B1.special === 'bolus') {
+          for (var dr = -2; dr <= 2; dr++) for (var dc = -2; dc <= 2; dc++) {
+            cells.push([s.r + dr, s.c + dc]);
+          }
+          banner('DOUBLE BOLUS', 3);
+        }
         A.special();
       }
       FX.shake(14);
@@ -504,7 +625,8 @@
 
   function spendMove() {
     L.moves--;
-    L.touchedCols = {};                 // files only sink in columns the player actually cleared
+    L.touchedCols = {};
+    if (L.eventMoves > 0 && --L.eventMoves === 0) L.eventMult = 1;                 // files only sink in columns the player actually cleared
     if (L.bonusWindow > 0) L.bonusWindow--;
     if (L.boss) {
       L.boss.movesSince++;
@@ -544,6 +666,11 @@
     applyClears(cells, makes);
   }
 
+  /** Deep chains resolve faster and faster — the board runs away with you. */
+  function chainSpeed(base) {
+    return Math.max(base * 0.55, base - (L.chain - 1) * 0.018);
+  }
+
   function applyClears(cells, makes) {
     // SURGE — from the third link on, the scanner overdrives and detonates a
     // free burst of its own, so long chains visibly snowball.
@@ -565,7 +692,7 @@
     var res = L.board.clearCells(cells);
     if (!res.cleared.length && !res.armor.length) { endCascade(); return; }
 
-    var mult = Math.min(8, Math.max(1, L.chain)) * (L.bonusWindow > 0 ? 1.5 : 1);
+    var mult = Math.min(8, Math.max(1, L.chain)) * (L.bonusWindow > 0 ? 1.5 : 1) * (L.eventMult || 1);
     L.mult = mult;
     var gain = Math.round(res.gems * 60 * mult);
     L.score += gain;
@@ -609,7 +736,7 @@
     FX.ring(canvas.width / 2, canvas.height / 2, L.world.accent, TILE * 0.4, TILE * 4.2, 0.5);
 
     L.makes = makes || [];
-    L.phase = 'clear'; L.anim = 0; L.animDur = 0.26;
+    L.phase = 'clear'; L.anim = 0; L.animDur = chainSpeed(0.15);
     syncHUD();
   }
 
@@ -634,7 +761,7 @@
     }
     out.falls.forEach(function (f) { view(f.to, f.c).dy = -(f.to - f.from) * TILE; });
     out.spawns.forEach(function (s) { view(s.r, s.c).dy = -(s.r + 1.5) * TILE; });
-    L.phase = 'fall'; L.anim = 0; L.animDur = 0.28;
+    L.phase = 'fall'; L.anim = 0; L.animDur = chainSpeed(0.17);
   }
 
   function endCascade() {
@@ -655,6 +782,7 @@
 
     if (L.def.type === 'files') sinkFiles();
     if (L.moves <= 0) return finish(false);
+    if (maybeCurveball()) return;
     if (!L.board.hasMove()) {
       toast('No moves left on the board — reshuffling.');
       L.board.shuffle();
@@ -691,6 +819,85 @@
       announce('Case file delivered. ' + L.filesDelivered + ' of ' + L.def.target + '.');
       if (goalMet()) { syncHUD(); return finish(true); }
     }
+  }
+
+  /* ── curve balls: the shift throws something at you every few moves ──
+     Mostly generous, occasionally awkward. Always announced, never silent. */
+  var CURVEBALLS = [
+    { id: 'code-blue', name: 'CODE BLUE', tier: 3, good: true,
+      say: 'Code blue — every point counts double for three moves.',
+      run: function () { L.eventMult = 2; L.eventMoves = 3; } },
+    { id: 'surge', name: 'POWER SURGE', tier: 2, good: true,
+      say: 'Power surge — a tile just charged itself into a beam.',
+      run: function () {
+        var r = L.board.rnd(RR.SIZE), c = L.board.rnd(RR.SIZE), cell = L.board.grid[r][c];
+        if (cell.file) return;
+        cell.special = 'beam'; cell.dir = Math.random() < 0.5 ? 'h' : 'v';
+        cell.infected = false; cell.blur = false;
+        FX.ring(c * TILE + TILE / 2, r * TILE + TILE / 2, '#fff', TILE * 0.2, TILE * 2, 0.5);
+      } },
+    { id: 'spill', name: 'CONTRAST SPILL', tier: 2, good: true,
+      say: 'Contrast spill — four tiles just changed type.',
+      run: function () {
+        var want = L.def.gem ? RR.GEM_INDEX[L.def.gem].i : L.board.rnd(6);
+        for (var k = 0; k < 4; k++) {
+          var r = L.board.rnd(RR.SIZE), c = L.board.rnd(RR.SIZE), cell = L.board.grid[r][c];
+          if (cell.special || cell.file) continue;
+          cell.gem = want;
+          FX.burst(c * TILE + TILE / 2, r * TILE + TILE / 2, RR.GEMS[want].glow, 10, { speed: 160 });
+        }
+      } },
+    { id: 'stat', name: 'STAT ORDER', tier: 3, good: true,
+      say: 'Stat order — one row cleared for you.',
+      run: function () {
+        var r = L.board.rnd(RR.SIZE), cells = [], seen = {};
+        for (var i = 0; i < RR.SIZE; i++) L.board.blastCells(r, i, cells, seen);
+        L.pendingBlast = cells;
+      } },
+    { id: 'second', name: 'SECOND OPINION', tier: 2, good: true,
+      say: 'Second opinion — two moves back on the board.',
+      run: function () { L.moves += 2; } },
+    { id: 'storm', name: 'ARTIFACT STORM', tier: 1, good: false,
+      say: 'Artifact storm — three tiles just fogged over.',
+      run: function () {
+        for (var k = 0; k < 3; k++) {
+          var r = L.board.rnd(RR.SIZE), c = L.board.rnd(RR.SIZE);
+          L.board.grid[r][c].fog = true;
+          FX.burst(c * TILE + TILE / 2, r * TILE + TILE / 2, '#bcd7ff', 8, { speed: 140 });
+        }
+      } },
+    { id: 'shift', name: 'SHIFT CHANGE', tier: 1, good: false,
+      say: 'Shift change — the whole board just turned over.',
+      run: function () { L.board.shuffle(); }
+    }
+  ];
+
+  function maybeCurveball() {
+    if (!L || L.over || L.tutorialGate) return false;
+    if (TUT.on) return false;
+    L.sinceEvent = (L.sinceEvent || 0) + 1;
+    if (L.sinceEvent < 5) return false;
+    if (L.board.rng() < 0.45) return false;              // not every window fires
+    L.sinceEvent = 0;
+    // three good ones for every awkward one
+    var pool = CURVEBALLS.filter(function (e) { return e.good; });
+    if (L.board.rng() < 0.25) pool = CURVEBALLS.filter(function (e) { return !e.good; });
+    var ev = pool[Math.floor(L.board.rng() * pool.length)];
+    ev.run();
+    banner(ev.name, ev.tier);
+    toast(ev.say);
+    A.chainCall(ev.good ? 5 : 2);
+    FX.flash(ev.good ? '#4ce6a4' : '#ff9a5a', 0.16);
+    buzz(ev.good ? [18, 40, 18] : 40);
+    announce(ev.name + '. ' + ev.say);
+    syncHUD();
+    if (L.pendingBlast) {
+      var cells = L.pendingBlast; L.pendingBlast = null;
+      L.chain = 0;
+      applyClears(cells, []);
+      return true;                                        // the cascade takes over
+    }
+    return false;
   }
 
   /* ── combo calls: the escalation ladder ─────────────────────── */
@@ -862,7 +1069,7 @@
     });
     toast(b.def.taunt[L.board.rnd(b.def.taunt.length)]);
     announce(b.def.name + ' attacks.');
-    L.phase = 'boss'; L.anim = 0; L.animDur = 0.5;
+    L.phase = 'boss'; L.anim = 0; L.animDur = 0.32;
   }
 
   function stagger() {
@@ -911,9 +1118,9 @@
     var input = $('dict-input');
     var ok = normalise(input.value) === normalise(dict.term.word);
     var st = cardState(dict.term.i);
-    st.at = Date.now();
     if (ok) {
-      st.seen++;
+      save.xp += 120;
+      creditLearning(dict.term.i, true);
       input.className = 'good';
       A.correct();
       L.moves += 3; L.bonusWindow = 3;
@@ -928,7 +1135,7 @@
       buzz([20, 40, 20]);
       cheer();
     } else {
-      st.missed++;
+      creditLearning(dict.term.i, false);
       input.className = 'bad';
       A.wrong();
       toast('It was “' + dict.term.word + '”. No penalty — it goes in tomorrow\'s Morning Rounds.');
@@ -950,20 +1157,33 @@
   }
 
   /* ── boosters ────────────────────────────────────────────── */
+  var ARMED_HINT = {
+    beam:   'Windowing armed — pick a tile to charge it into a beam.',
+    hammer: 'Aspirator armed — pick any tile to remove it. Costs no move.',
+    row:    'Scanogram armed — pick a tile to clear its whole row.',
+    colour: 'Protocol call armed — pick a tile to clear every gem of that type.'
+  };
+
   function useBooster(kind) {
     if (!L || L.phase !== 'idle') return;
     if (kind !== 'dictate' && save.boosters[kind] <= 0) return;
+    if (ARMED_HINT[kind]) {                       // targeted tools arm, then wait for a tap
+      var was = L.armed;
+      document.querySelectorAll('.booster').forEach(function (b) { b.classList.remove('armed'); });
+      L.armed = (was === kind) ? null : kind;
+      if (L.armed) {
+        $('bst-' + kind).classList.add('armed');
+        toast(ARMED_HINT[kind]);
+        A.ping();
+      }
+      return;
+    }
     if (kind === 'shuffle') {
       save.boosters.shuffle--; L.board.shuffle();
       A.special(); FX.flash(L.world.accent, .2); banner('CONTRAST INJECTION');
     } else if (kind === 'moves') {
       save.boosters.moves--; L.moves += 3;
       A.correct(); FX.text(canvas.width / 2, canvas.height / 2, '+3 MOVES', '#4ce6a4', { size: 34 });
-    } else if (kind === 'beam') {
-      L.armed = L.armed === 'beam' ? null : 'beam';
-      $('bst-beam').classList.toggle('armed', !!L.armed);
-      toast(L.armed ? 'Windowing armed — pick a tile to charge it.' : 'Windowing cancelled.');
-      return;
     } else if (kind === 'dictate') {
       openDictation('bonus'); return;
     }
@@ -972,14 +1192,51 @@
 
   function applyArmed(r, c) {
     var cell = L.board.grid[r][c];
-    if (cell.file || cell.gem < 0) return;
-    save.boosters.beam--;
-    cell.special = 'beam'; cell.dir = Math.random() < 0.5 ? 'h' : 'v';
-    cell.infected = false; cell.blur = false;
+    if (!cell || cell.gem < 0) return;
+    var kind = L.armed;
     L.armed = null;
-    $('bst-beam').classList.remove('armed');
-    A.special();
-    FX.ring(c * TILE + TILE / 2, r * TILE + TILE / 2, '#fff', TILE * 0.2, TILE * 1.6, 0.5);
+    document.querySelectorAll('.booster').forEach(function (b) { b.classList.remove('armed'); });
+
+    if (kind === 'beam') {
+      if (cell.file) return;
+      save.boosters.beam--;
+      cell.special = 'beam'; cell.dir = Math.random() < 0.5 ? 'h' : 'v';
+      cell.infected = false; cell.blur = false;
+      A.special();
+      FX.ring(c * TILE + TILE / 2, r * TILE + TILE / 2, '#fff', TILE * 0.2, TILE * 1.6, 0.5);
+    } else if (kind === 'hammer') {
+      save.boosters.hammer--;
+      A.beam(); buzz(18);
+      FX.burst(c * TILE + TILE / 2, r * TILE + TILE / 2, '#dfe9ff', 20, { speed: 260, size: 5 });
+      L.chain = 0;
+      applyClears([[r, c]], []);                 // free: costs no move
+      persist(); syncHUD();
+      return;
+    } else if (kind === 'row') {
+      save.boosters.row--;
+      var cells = [], seen = {};
+      for (var i = 0; i < RR.SIZE; i++) L.board.blastCells(r, i, cells, seen);
+      A.beam(); FX.shake(12); buzz([16, 30, 16]);
+      banner('SCANOGRAM', 2);
+      L.chain = 0;
+      applyClears(cells, []);
+      persist(); syncHUD();
+      return;
+    } else if (kind === 'colour') {
+      save.boosters.colour--;
+      var gem = cell.gem, all = [], seen2 = {};
+      for (var rr = 0; rr < RR.SIZE; rr++) for (var cc = 0; cc < RR.SIZE; cc++) {
+        if (L.board.grid[rr][cc].gem === gem && !L.board.grid[rr][cc].file) {
+          L.board.blastCells(rr, cc, all, seen2);
+        }
+      }
+      A.core(); FX.flash(RR.GEMS[gem].glow, 0.2); FX.shake(14); buzz([20, 40, 20]);
+      banner('PROTOCOL CALL', 3);
+      L.chain = 0;
+      applyClears(all, []);
+      persist(); syncHUD();
+      return;
+    }
     persist(); syncHUD();
   }
 
@@ -999,7 +1256,7 @@
     if (!L || L.phase !== 'idle') return;
     var p = cellFromEvent(e); if (!p) return;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* Safari can refuse capture; the swap still works */ }
-    if (L.armed === 'beam') { applyArmed(p.r, p.c); return; }
+    if (L.armed) { applyArmed(p.r, p.c); return; }
     drag = { r: p.r, c: p.c, x: e.clientX, y: e.clientY };
     L.cursor = { r: p.r, c: p.c };
     buzz(8);
@@ -1046,12 +1303,15 @@
     }
     if (k === ' ' || k === 'Enter') {
       e.preventDefault();
-      if (L.armed === 'beam') { applyArmed(cur.r, cur.c); return; }
+      if (L.armed) { applyArmed(cur.r, cur.c); return; }
       L.sel = (L.sel && L.sel.r === cur.r && L.sel.c === cur.c) ? null : { r: cur.r, c: cur.c };
       A.ui();
       announce(L.sel ? 'Selected. Move to a neighbour and press space to swap.' : 'Deselected.');
     }
-    if (k === 'Escape') { L.sel = null; L.armed = null; $('bst-beam').classList.remove('armed'); }
+    if (k === 'Escape') {
+      L.sel = null; L.armed = null;
+      document.querySelectorAll('.booster').forEach(function (b) { b.classList.remove('armed'); });
+    }
   });
 
   /* ── the frame ───────────────────────────────────────────── */
@@ -1283,6 +1543,13 @@
     var card = RR.TERMS[L.cardIndex];
     var st = cardState(L.cardIndex);
     if (win) { st.seen++; st.at = Date.now(); }
+    var bonusCard = null;
+    if (win && stars === 3) {                     // perfect read: a second card
+      for (var bi = 0; bi < RR.TERMS.length; bi++) {
+        var idx = (L.cardIndex + 1 + bi) % RR.TERMS.length;
+        if (!save.cards[idx]) { bonusCard = idx; cardState(idx).at = Date.now(); break; }
+      }
+    }
     if (win && stars === 3) save.boosters[['shuffle', 'beam', 'moves'][L.n % 3]]++;
     persist();
 
@@ -1301,6 +1568,12 @@
     var next = RR.RANKS[RR.RANKS.indexOf(rank) + 1];
     var pct = next ? (save.xp - rank.xp) / (next.xp - rank.xp) * 100 : 100;
     $('result-rank').textContent = rank.name + ' · +' + xpGain + ' XP';
+    if (bonusCard != null) {
+      setTimeout(function () {
+        toast('Perfect read — bonus case card: “' + RR.TERMS[bonusCard].word + '”');
+        A.ping();
+      }, 1800);
+    }
     $('result-next').disabled = !win || L.n >= RR.LEVELS.length;
 
     var starEls = $('result-stars').children;
@@ -1361,6 +1634,9 @@
     $('bst-shuffle').addEventListener('click', function () { useBooster('shuffle'); });
     $('bst-beam').addEventListener('click', function () { useBooster('beam'); });
     $('bst-moves').addEventListener('click', function () { useBooster('moves'); });
+    $('bst-hammer').addEventListener('click', function () { useBooster('hammer'); });
+    $('bst-row').addEventListener('click', function () { useBooster('row'); });
+    $('bst-colour').addEventListener('click', function () { useBooster('colour'); });
     $('bst-dictate').addEventListener('click', function () { useBooster('dictate'); });
 
     $('tut-next').addEventListener('click', function () { A.ui(); tutNext(); });

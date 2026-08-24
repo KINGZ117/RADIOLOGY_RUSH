@@ -312,10 +312,12 @@
     }
     /* L2 — the hook: plucked, through the delay */
     if (L[2] > 0.01) {
-      if (beat % 2 === 0) {
-        var m2 = S.motif[(beat / 2) % 8];
-        synth({ at: t, freq: note(m2, 1), type: 'square', dur: 0.14, gain: 0.13 * L[2],
-          cutoff: 3400, q: 2, verb: 0.25, echo: 0.35, bus: A.duckBus });
+      var m2 = S.motif[beat % 8];
+      if (beat % 2 === 0 || beat % 8 === 3 || beat % 8 === 7) {
+        synth({ at: t, freq: note(m2, 1), type: 'square', dur: 0.15, gain: 0.22 * L[2],
+          cutoff: 4200, q: 2, verb: 0.25, echo: 0.35, bus: A.duckBus });
+        synth({ at: t, freq: note(m2, 2), type: 'triangle', dur: 0.12, gain: 0.09 * L[2],
+          cutoff: 7000, verb: 0.3, bus: A.duckBus });
       }
     }
     /* L3 — supersaw pad and counter-lead: full flight */
@@ -342,6 +344,12 @@
         if (M.layer[i] < 0.02) M.layer[i] = 0;
       }
       if (bar === 7 && M.target >= 2) riser(t + (60 / M.bpm) * 2, (60 / M.bpm) * 2, A.musicBus);
+      if (bar % 4 === 3) {                       // a fill, so the loop never sits still
+        var sp = 60 / M.bpm / 4;
+        for (var f = 0; f < 6; f++) {
+          snare(t + (12 + f * 0.6) * sp, A.musicBus, 0.5 + f * 0.09);
+        }
+      }
       if (bar === 0 && M.target >= 3) impact(t, A.musicBus);
     }
   }
@@ -377,8 +385,8 @@
     M.bpm = S.bpm + wobble * 2;
     M.root = S.root * Math.pow(2, (((levelN || 1) % 3) - 1) / 12);
     M.mode = S.mode;
-    M.layer = [1, 0, 0, 0];
-    M.target = Math.max(1, M.target);
+    M.layer = [1, 1, 1, 0];        // drums, hats and the hook are the baseline now
+    M.target = Math.max(3, M.target);
     M.step = 0;
     M.next = A.ctx.currentTime + 0.1;
     gen++;                       // any pending stop belongs to an older track
@@ -388,7 +396,7 @@
     var t = A.ctx.currentTime;
     A.musicBus.gain.cancelScheduledValues(t);
     A.musicBus.gain.setValueAtTime(A.musicBus.gain.value, t);
-    A.musicBus.gain.linearRampToValueAtTime(A.music ? 0.8 : 0.0001, t + 1.1);
+    A.musicBus.gain.linearRampToValueAtTime(A.music ? 1.15 : 0.0001, t + 1.1);
   };
 
   A.stopMusic = function () {
@@ -410,10 +418,10 @@
     if (!A.ctx) return;
     var t = A.ctx.currentTime;
     A.musicBus.gain.cancelScheduledValues(t);
-    A.musicBus.gain.linearRampToValueAtTime(on ? 0.8 : 0.0001, t + 0.35);
+    A.musicBus.gain.linearRampToValueAtTime(on ? 1.15 : 0.0001, t + 0.35);
   };
 
-  A.setHeat = function (h) { M.target = Math.max(1, Math.min(4, h | 0)); };
+  A.setHeat = function (h) { M.target = Math.max(3, Math.min(4, h | 0)); };
   A.energy = function (v) { A.setHeat(1 + Math.round(Math.min(1, v) * 3)); };
 
   /** The victory cue: a rising IV–V–I with a lead over the top. */
@@ -683,7 +691,7 @@
       d.cancelScheduledValues(now);
       d.setValueAtTime(d.value, now);
       d.linearRampToValueAtTime(0.3, now + 0.08);
-      d.linearRampToValueAtTime(0.8, now + VOICE[id].duration + 0.25);
+      d.linearRampToValueAtTime(1.15, now + VOICE[id].duration + 0.25);
     }
     return caption;
   };
