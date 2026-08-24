@@ -16,3 +16,6 @@ assets/
 
 # Local dev server config
 .claude/
+
+# Local Netlify folder
+.netlify

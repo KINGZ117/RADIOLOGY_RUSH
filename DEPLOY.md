@@ -1,4 +1,19 @@
-# Getting Radiology Rush live on Netlify
+# Radiology Rush — deployment
+
+**Live: https://radiology-rush.netlify.app**
+Admin: https://app.netlify.com/projects/radiology-rush · Repo: `KINGZ117/RADIOLOGY_RUSH`
+
+## Publishing an update
+
+Double-click **`Publish update.command`**. It pushes to GitHub *and* publishes to
+Netlify, then prints the live URL. That is the whole workflow.
+
+The site is deployed from this Mac via the Netlify CLI, so the repo does not need to be
+connected to Netlify for updates to go out. If you would rather have every GitHub push
+deploy itself, connect it once: Netlify → **Site configuration → Build & deploy →
+Link repository** → pick `RADIOLOGY_RUSH`. Both routes can coexist.
+
+## The original setup, for reference
 
 The game is a static site — no build step, no server, no database. Netlify just
 serves the files. Total payload is **8.5 MB**.
