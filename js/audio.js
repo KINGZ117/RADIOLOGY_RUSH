@@ -63,7 +63,13 @@
     A.ambBus = A.ctx.createGain(); A.ambBus.gain.value = 0.0; A.ambBus.connect(A.master);
     A.musicBus = A.ctx.createGain(); A.musicBus.gain.value = 0.0; A.musicBus.connect(A.master);
     // everything rhythmic that should duck under the kick
-    A.duckBus = A.ctx.createGain(); A.duckBus.gain.value = 1.0; A.duckBus.connect(A.musicBus);
+    A.duckBus = A.ctx.createGain(); A.duckBus.gain.value = 1.0;
+    // the zone filter: closed when you are ticking along, wide open when you are flying
+    A.zoneFilter = A.ctx.createBiquadFilter();
+    A.zoneFilter.type = 'lowpass';
+    A.zoneFilter.frequency.value = 2600;
+    A.zoneFilter.Q.value = 0.8;
+    A.duckBus.connect(A.zoneFilter); A.zoneFilter.connect(A.musicBus);
   };
 
   A.resume = function () { A.init(); if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
@@ -347,6 +353,15 @@
     if (L[1] > 0.01 && S.hat[beat] === 'x') {
       hat(t, beat % 8 === 6, A.musicBus, L[1] * 0.5);
     }
+    // zone extras: offbeat shaker and an octave-up double of the melody
+    if (M.zone > 0.45 && beat % 2 === 1) {
+      hat(t, false, A.musicBus, 0.22 * M.zone);
+    }
+    if (M.zone > 0.7 && beat % 4 === 0 && L[2] > 0.01) {
+      synth({ at: t, freq: note(root + S.motif[(bar * 4 + Math.floor(beat / 4)) % 8], 2),
+        type: 'triangle', atk: 0.01, dur: 0.3, gain: 0.07 * M.zone, cutoff: 9000,
+        verb: 0.5, echo: 0.35, bus: A.duckBus });
+    }
 
     /* ── MELODY: an eight-bar phrase with rests, over the progression ── */
     if (L[2] > 0.01) {
@@ -460,6 +475,36 @@
   };
 
   A.setHeat = function (h) { M.target = Math.max(3, Math.min(4, h | 0)); };
+
+  /**
+   * The zone, 0 to 1. Opens the filter, lifts the mix and thickens the groove as
+   * the player strings combos together. Called every frame; cheap and smoothed.
+   */
+  M.zone = 0;
+  A.setZone = function (z) {
+    z = Math.max(0, Math.min(1, z || 0));
+    M.zone = z;
+    if (!A.ctx || !A.zoneFilter) return;
+    var t = A.ctx.currentTime;
+    // 2.2 kHz when idle, 16 kHz at full flight — the track visibly brightens
+    A.zoneFilter.frequency.setTargetAtTime(2200 + z * z * 13800, t, 0.25);
+    A.zoneFilter.Q.setTargetAtTime(0.8 + z * 1.6, t, 0.3);
+    if (A.music) A.musicBus.gain.setTargetAtTime(1.15 + z * 0.35, t, 0.4);
+  };
+  A.getZone = function () { return M.zone; };
+
+  /** The moment the zone tops out: a drop, not just another layer. */
+  A.zonePeak = function () {
+    A.init(); if (!A.ctx) return;
+    var t = A.ctx.currentTime;
+    impact(t, A.musicBus);
+    riser(t, 0.5, A.musicBus);
+    [0, 7, 12].forEach(function (n, i) {
+      synth({ at: t + 0.12 + i * 0.04, freq: note(0, 1) * Math.pow(2, n / 12), type: 'sawtooth',
+        voices: 5, spread: 24, atk: 0.02, hold: 0.3, dur: 0.9, gain: 0.09,
+        cutoff: 8000, verb: 0.8, bus: A.musicBus });
+    });
+  };
   A.energy = function (v) { A.setHeat(1 + Math.round(Math.min(1, v) * 3)); };
 
   /** The victory cue: a rising IV–V–I with a lead over the top. */
@@ -775,7 +820,18 @@
     'rosa-3': 'Look at that contrast!',
     'kim-1': "I'm writing that one down!",
     'kim-2': 'Textbook cascade!',
-    'kim-3': 'Teach me that one!'
+    'kim-3': 'Teach me that one!',
+    'marco-4': "We're cooking now!",
+    'marco-5': 'Ooh, nice save!',
+    'marco-6': 'The scanner is glowing!',
+    'rosa-4': "You're in the zone!",
+    'rosa-5': 'Careful — moves are getting low.',
+    'rosa-6': 'Beautiful work in there!',
+    'kim-4': 'Chain reaction!',
+    'kim-5': "That's the one!",
+    'kim-6': 'The boss is wobbling!',
+    'zone-hold': 'Stay in the zone.',
+    'low-moves': 'Down to your last few moves.'
   };
   A.LINES = LINES;
 

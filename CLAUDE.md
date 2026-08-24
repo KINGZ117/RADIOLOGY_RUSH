@@ -38,6 +38,18 @@ no package manager.** Open `index.html` through a local server and it runs.
 - **Pace**: swap 0.10 s, clear 0.15 s, fall 0.17 s, and `chainSpeed()` shortens each link
   further so deep chains accelerate.
 
+## The zone (added 2026-08-24, additive)
+One number, `zone` (0-1) in game.js, rises with every combo and decays ~9 s to cold.
+It is pushed out each frame by `applyZone()` to four places: `A.setZone()` opens the
+music's `zoneFilter` from 2.2 kHz to 16 kHz and thickens the groove; the `--zone` CSS
+variable lifts plate brightness, saturation and the veil; `FX.setCap()` raises the
+particle budget; and the crew lean in more often. At 1.0 it fires `A.zonePeak()` — a
+drop — plus the IN THE ZONE banner. Nothing else changed: at zone 0 the game behaves
+exactly as before.
+
+Cameos now route through `react(kind)` with pools per situation (zone, save, boss, low,
+praise) — 30 voice lines in `media/voice/`, all captioned.
+
 ## Rules that are deliberate, not accidental
 - **Combo caps at ×8** ("OVERREAD"). Uncapped made one giant cascade the only strategy.
 - **Moves, never timers.** No energy meter, nothing purchasable, streaks never punish.

@@ -31,7 +31,11 @@ body.dys{--font:"Verdana","Trebuchet MS",system-ui,sans-serif;letter-spacing:.01
 #plate img,#plate video{
   position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   opacity:var(--plate-dim);transition:opacity .8s ease, filter .8s ease;
-  filter:brightness(var(--plate-bright,1.34)) saturate(var(--plate-sat,1.28)) hue-rotate(var(--plate-hue,0deg));
+  filter:
+    brightness(calc(var(--plate-bright,1.34) + var(--zone,0) * .42))
+    saturate(calc(var(--plate-sat,1.28) + var(--zone,0) * .55))
+    contrast(calc(1 + var(--zone,0) * .12))
+    hue-rotate(var(--plate-hue,0deg));
 }
 #plate video{opacity:0;transition:opacity .7s linear}
 #plate video.on{opacity:var(--plate-dim)}
@@ -596,3 +600,40 @@ body.reduced #board-wrap.overread::before{animation:none;opacity:0}
 .gcard.m1{border-color:rgba(200,135,63,.45)}
 .gcard.m2{border-color:rgba(201,214,232,.5)}
 .gcard.m3{border-color:rgba(255,207,106,.6);box-shadow:0 0 24px rgba(255,207,106,.14)}
+
+
+/* ── THE ZONE: the room lights up as the player gets hot ─────────────────
+   Everything here keys off one variable, --zone (0-1), set every frame. */
+#plate-veil{
+  opacity:calc(1 - var(--zone,0) * .42);
+  transition:opacity .5s ease;
+}
+#plate::after{ opacity:calc(.5 + var(--zone,0) * .5); }
+
+/* the board itself starts to glow */
+#board{
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 0 calc(var(--zone,0) * 70px) rgba(63,216,245,calc(var(--zone,0) * .55));
+  transition:box-shadow .4s ease;
+}
+#board-wrap.zoned::after{
+  content:"";position:absolute;inset:-6%;pointer-events:none;z-index:1;
+  background:radial-gradient(closest-side,rgba(255,207,106,.12),transparent 72%);
+  animation:zonePulse 2.4s ease-in-out infinite;
+}
+@keyframes zonePulse{50%{opacity:.45}}
+body.reduced #board-wrap.zoned::after{animation:none;opacity:.25}
+
+/* a slim heat bar under the objective, so the zone is legible not just felt */
+.hud-zonebar{
+  height:3px;border-radius:99px;background:rgba(255,255,255,.08);
+  margin-top:.25rem;overflow:hidden;
+}
+.hud-zonebar i{
+  display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2),#ff8ad0);
+  box-shadow:0 0 12px rgba(255,207,106,.6);
+  transition:width .25s ease-out;
+}

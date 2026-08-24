@@ -199,14 +199,37 @@
   var castKeys = ['marco', 'rosa', 'kim'], castAt = 0, castTimer = null;
 
   /** Pops a crew member in with a quick celebration. Captioned, so it works muted. */
-  function cheer(force) {
+  /** Reactions, not just celebrations — each one picks a fitting line. */
+  var REACTIONS = {
+    zone:   ['rosa-4', 'marco-4', 'kim-4'],
+    save:   ['marco-5', 'kim-5'],
+    boss:   ['kim-6', 'marco-6'],
+    low:    ['rosa-5'],
+    praise: ['rosa-6', 'kim-5', 'marco-4']
+  };
+
+  function react(kind, force) {
+    var pool = REACTIONS[kind];
+    if (!pool) return cheer(force);
+    var line = pool[Math.floor(Math.random() * pool.length)];
+    if (!A.hasVoice(line)) return cheer(force);      // fall back if the clip is missing
+    cheer(force, line);
+  }
+  RR.react = react;
+
+  function cheer(force, forcedLine) {
     var now = Date.now();
-    if (!force && now - castAt < 6500) return;
+    if (!force && now - castAt < 4200) return;
     castAt = now;
     var key = castKeys[Math.floor(Math.random() * castKeys.length)];
     var c = CAST[key];
     var frame = 1 + Math.floor(Math.random() * c.frames);
     var line = c.lines[Math.floor(Math.random() * c.lines.length)];
+    if (forcedLine) {                                // a reaction names its own line
+      var owner = forcedLine.split('-')[0];
+      if (CAST[owner]) { key = owner; c = CAST[owner]; frame = 1 + Math.floor(Math.random() * c.frames); }
+      line = forcedLine;
+    }
     var el = $('cast'), img = $('cast-img'), bubble = $('cast-bubble');
     img.src = 'media/chars/' + key + '-' + frame + '.png';
     img.alt = c.name + ' celebrating';
@@ -431,6 +454,7 @@
     setPlate(world, n);
     FX.clear();
     shownScore = 0;
+    zone = 0; zonePeaked = false; applyZone();
 
     L = {
       def: def, world: world, n: n,
@@ -438,6 +462,7 @@
       moves: def.moves, score: 0, chain: 0, mult: 1, bonusMoves: 0, bonusWindow: 0,
       phase: 'idle', sel: null, cursor: { r: 4, c: 4 }, armed: null,
       collected: {}, fogCleared: 0, filesDelivered: 0,
+      zoneShown: 0,
       sinceEvent: 0, eventMult: 1, eventMoves: 0, pendingBlast: null,
       dying: [], anim: 0, animDur: 0, next: null,
       view: [], daily: !!opts.daily, deck: opts.deck || null,
@@ -640,6 +665,7 @@
       }
     }
     if (L.coop.on) L.coop.turn = L.coop.turn === 1 ? 2 : 1;
+    if (L.moves === 4 && !L.warnedLow) { L.warnedLow = true; react('low', true); }
     syncHUD();
   }
 
@@ -709,7 +735,9 @@
       var w = res.collected[L.boss.weak] || 0;
       if (w) {
         var dmg = Math.round(w * 9 * Math.min(3, mult) * (L.boss.dbl ? 2 : 1));
+        var wasAbove = L.boss.hp / L.boss.max > 0.35;
         L.boss.hp = Math.max(0, L.boss.hp - dmg);
+        if (wasAbove && L.boss.hp / L.boss.max <= 0.35) react('boss');
         L.boss.dbl = false;
         A.bossHit(); FX.shake(10);
         FX.text(canvas.width / 2, TILE * 1.4, '−' + dmg, '#ff8a8a', { size: 30 });
@@ -734,6 +762,7 @@
       FX.text(canvas.width / 2, canvas.height * 0.42, '×' + Math.round(mult * 10) / 10, '#ffcf6a', { size: 34 + L.chain * 3 });
     }
     comboCall(L.chain);
+    feedZone(L.chain, res.gems);
     A.match(L.chain, res.gems);
     A.setHeat(1 + Math.min(3, Math.floor(L.chain / 2)));   // the music grows with the streak
     buzz(L.chain >= 5 ? [18, 40, 26] : Math.min(30, 8 + L.chain * 4));
@@ -823,6 +852,45 @@
       announce('Case file delivered. ' + L.filesDelivered + ' of ' + L.def.target + '.');
       if (goalMet()) { syncHUD(); return finish(true); }
     }
+  }
+
+  /* ── THE ZONE ─────────────────────────────────────────────────────────
+     A single 0-1 number that rises as you string matches together and decays
+     when you stop. It drives the music filter, the plate lighting, the particle
+     budget and how often the crew lean in. Purely additive: if it stays at 0
+     the game behaves exactly as it did before. */
+  var zone = 0, zonePeaked = false;
+
+  function feedZone(chain, cleared) {
+    var gain = 0.06 + Math.min(0.28, chain * 0.05) + Math.min(0.08, cleared * 0.008);
+    zone = Math.min(1, zone + gain);
+    if (zone >= 0.999 && !zonePeaked) {
+      zonePeaked = true;
+      A.zonePeak();
+      banner('IN THE ZONE', 4);
+      FX.flash('#ffcf6a', 0.22);
+      buzz([30, 40, 30, 40, 50]);
+      react('zone', true);
+      announce('In the zone.');
+    }
+  }
+
+  function decayZone(dt) {
+    if (zone <= 0) return;
+    zone = Math.max(0, zone - dt * 0.11);          // ~9 s from full to cold
+    if (zone < 0.5) zonePeaked = false;
+  }
+
+  /** Push the zone out to everything that listens to it. */
+  function applyZone() {
+    A.setZone(zone);
+    var root = document.documentElement.style;
+    root.setProperty('--zone', zone.toFixed(3));
+    FX.setCap(Math.round(180 + zone * 240));
+    var wrap = document.getElementById('board-wrap');
+    if (wrap) wrap.classList.toggle('zoned', zone > 0.55);
+    var bar = $('hud-zone');
+    if (bar) bar.style.width = (zone * 100) + '%';
   }
 
   /* ── curve balls: the shift throws something at you every few moves ──
@@ -1137,7 +1205,7 @@
       }
       toast('“' + dict.term.word + '” — correct. +3 moves, ×1.5 for three moves.');
       buzz([20, 40, 20]);
-      cheer();
+      react('praise');
     } else {
       creditLearning(dict.term.i, false);
       input.className = 'bad';
@@ -1358,6 +1426,8 @@
       }
     }
     if (punch > 0) punch = Math.max(0, punch - dt * 0.9);
+    decayZone(dt);
+    applyZone();
     rollScore(dt);
     FX.update(dt);
     render();
