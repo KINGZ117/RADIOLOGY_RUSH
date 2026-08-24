@@ -473,6 +473,7 @@
     requestAnimationFrame(fitCanvas);
     if (!save.seenTutorial && !L.coop.on) setTimeout(tutStart, 450);
     syncHUD();
+    A.levelStart();
     banner(def.type === 'boss' ? L.boss.def.name : world.name);
     announce('Level ' + n + '. ' + RR.OBJECTIVE_TEXT(def) + '. ' + L.moves + ' moves.');
     canvas.focus();
@@ -726,6 +727,9 @@
     res.armor.forEach(function (p) {
       FX.burst(p[1] * TILE + TILE / 2, p[0] * TILE + TILE / 2, '#dfe9ff', 8, { speed: 150, size: 3 });
     });
+    if (res.armor.length) A.armor();
+    if (res.fog) A.fogClear();
+    if (res.cleaned && res.cleaned.length) A.cleanse();
     if (L.chain >= 2) {
       FX.text(canvas.width / 2, canvas.height * 0.42, '×' + Math.round(mult * 10) / 10, '#ffcf6a', { size: 34 + L.chain * 3 });
     }
@@ -756,7 +760,7 @@
     var out = L.board.collapse({ fileChance: fileChance });
     L.filesDelivered += out.delivered;
     if (out.delivered) {
-      A.correct();
+      A.deliver();
       FX.text(canvas.width / 2, canvas.height - TILE * 0.6, 'CASE FILE DELIVERED', '#4ce6a4', { size: 22 });
     }
     out.falls.forEach(function (f) { view(f.to, f.c).dy = -(f.to - f.from) * TILE; });
@@ -814,7 +818,7 @@
     }
     if (delivered) {
       L.filesDelivered += delivered;
-      A.correct();
+      A.deliver();
       FX.text(canvas.width / 2, canvas.height - TILE * 0.8, 'CASE FILE DELIVERED', '#4ce6a4', { size: 24 });
       announce('Case file delivered. ' + L.filesDelivered + ' of ' + L.def.target + '.');
       if (goalMet()) { syncHUD(); return finish(true); }
@@ -886,7 +890,7 @@
     ev.run();
     banner(ev.name, ev.tier);
     toast(ev.say);
-    A.chainCall(ev.good ? 5 : 2);
+    A.event(ev.good);
     FX.flash(ev.good ? '#4ce6a4' : '#ff9a5a', 0.16);
     buzz(ev.good ? [18, 40, 18] : 40);
     announce(ev.name + '. ' + ev.say);
@@ -1174,7 +1178,7 @@
       if (L.armed) {
         $('bst-' + kind).classList.add('armed');
         toast(ARMED_HINT[kind]);
-        A.ping();
+        A.arm();
       }
       return;
     }
@@ -1264,7 +1268,7 @@
       trySwap(L.sel.r, L.sel.c, p.r, p.c);
     } else {
       L.sel = (L.sel && L.sel.r === p.r && L.sel.c === p.c) ? null : p;
-      A.ui();
+      A.select();
     }
   });
   canvas.addEventListener('pointermove', function (e) {
@@ -1538,6 +1542,7 @@
     var prev = starsFor(L.n);
     if (stars > prev) { save.stars[L.n] = stars; }
     var xpGain = Math.round(L.score / 10) + stars * 120 + (win ? 200 : 40);
+    var rankBefore = RR.rankFor(save.xp);
     save.xp += xpGain;
 
     var card = RR.TERMS[L.cardIndex];
@@ -1565,6 +1570,13 @@
     document.querySelector('.result-card').classList.toggle('gold', win && stars === 3);
 
     var rank = RR.rankFor(save.xp);
+    if (rankBefore && rank.name !== rankBefore.name) {
+      setTimeout(function () {
+        A.rankUp();
+        toast('Promoted — you are ' + rank.name + ' now.');
+        cheer(true);
+      }, 1400);
+    }
     var next = RR.RANKS[RR.RANKS.indexOf(rank) + 1];
     var pct = next ? (save.xp - rank.xp) / (next.xp - rank.xp) * 100 : 100;
     $('result-rank').textContent = rank.name + ' · +' + xpGain + ' XP';
@@ -1623,7 +1635,7 @@
     $('btn-glossary').addEventListener('click', function () { A.ui(); show('glossary'); });
     $('btn-settings').addEventListener('click', function () { A.ui(); show('settings'); });
     document.querySelectorAll('[data-nav]').forEach(function (b) {
-      b.addEventListener('click', function () { A.ui(); show(b.dataset.nav); });
+      b.addEventListener('click', function () { A.nav(true); show(b.dataset.nav); });
     });
     $('btn-quit').addEventListener('click', function () { A.stopMusic(); L = null; show('map'); });
 

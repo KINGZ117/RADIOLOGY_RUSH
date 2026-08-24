@@ -169,7 +169,9 @@
     out.gain.setValueAtTime(0.0001, t);
     out.gain.linearRampToValueAtTime(g, t + atk);
     if (o.hold) out.gain.setValueAtTime(g, t + atk + o.hold);
-    out.gain.exponentialRampToValueAtTime(0.0001, t + atk + (o.hold || 0) + (o.dur || 0.3));
+    var endAt = t + atk + (o.hold || 0) + (o.dur || 0.3);
+    out.gain.exponentialRampToValueAtTime(0.0002, endAt);
+    out.gain.linearRampToValueAtTime(0, endAt + 0.006);   // land on true silence
 
     out.connect(o.bus || A.sfxBus);
     if (o.verb) { var v = A.ctx.createGain(); v.gain.value = o.verb; out.connect(v); v.connect(A.verbSend); }
@@ -192,18 +194,20 @@
     var peak = o.gain == null ? 0.2 : o.gain, atk = o.atk == null ? 0.003 : o.atk;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(peak, t + atk);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + atk + (o.dur || 0.2));
+    var stopAt = t + atk + (o.dur || 0.2);
+    g.gain.exponentialRampToValueAtTime(0.0002, stopAt);
+    g.gain.linearRampToValueAtTime(0, stopAt + 0.006);
     src.connect(f); f.connect(g); g.connect(o.bus || A.sfxBus);
     if (o.verb) { var v = A.ctx.createGain(); v.gain.value = o.verb; g.connect(v); v.connect(A.verbSend); }
-    src.start(t); src.stop(t + (o.dur || 0.2) + atk + 0.1);
+    src.start(t); src.stop(stopAt + 0.05);
   }
 
   /* ───────────────────────── drum kit ───────────────────────── */
   function kick(t, bus, level) {
     synth({ at: t, freq: 150, glide: 42, type: 'sine', dur: 0.34, atk: 0.002,
       gain: 0.85 * (level || 1), cutoff: 900, bus: bus || A.musicBus });
-    hit({ at: t, freq: 2600, sweep: 400, dur: 0.028, gain: 0.20 * (level || 1),
-      filterType: 'highpass', bus: bus || A.musicBus });
+    hit({ at: t, freq: 1400, sweep: 260, dur: 0.055, gain: 0.10 * (level || 1),
+      atk: 0.004, filterType: 'lowpass', bus: bus || A.musicBus });
   }
   function snare(t, bus, level) {
     hit({ at: t, freq: 1700, q: 0.7, dur: 0.17, gain: 0.34 * (level || 1),
@@ -282,74 +286,108 @@
   function duck(t) {
     var g = A.duckBus.gain;
     g.cancelScheduledValues(t);
-    g.setValueAtTime(0.34, t);
+    g.setValueAtTime(g.value, t);                       // start from where it actually is
+    g.linearRampToValueAtTime(0.4, t + 0.012);          // 12 ms dip, not a step
     g.linearRampToValueAtTime(1, t + (60 / M.bpm) * 0.72);
   }
 
   var S = null;   // active score
 
+  /* Four-chord progressions. Tone first: a pad and a bass note are always
+     sounding, so the percussion sits on top of music instead of being the music. */
+  var PROGRESSIONS = {
+    bright:      [0, 5, 3, 4],
+    wide:        [0, 3, 5, 2],
+    metal:       [0, 4, 2, 5],
+    liquid:      [0, 2, 4, 3],
+    weightless:  [0, 4, 5, 2],
+    urgent:      [0, 5, 4, 3],
+    menace:      [0, 1, 4, 3],
+    calm:        [0, 3, 4, 2]
+  };
+
+  function chordAt(bar) {
+    var prog = PROGRESSIONS[S.colour] || PROGRESSIONS.bright;
+    return prog[Math.floor(bar / 2) % prog.length];
+  }
+
   function scheduleStep(step, t) {
     var beat = step % 16, bar = Math.floor(step / 16) % 8;
     var L = M.layer;
     M.bar = bar;
+    var root = chordAt(bar);
+    var barSecs = (60 / M.bpm) * 4;
 
-    /* L0 — drums and the sidechained bass: the spine */
-    if (L[0] > 0.01) {
-      if (S.kick[beat] === 'x') { kick(t, A.musicBus, L[0]); duck(t); }
-      if (S.snare[beat] === 'x') (M.boss ? snare : clap)(t, A.musicBus, L[0] * 0.9);
-      if (beat % 2 === 0) {
-        var bd = S.motif[(beat / 2) % 8];
-        synth({ at: t, freq: note(bd, -2), type: 'sawtooth', voices: 2, spread: 8,
-          dur: 0.2, hold: 0.02, gain: 0.28 * L[0], cutoff: M.boss ? 520 : 420, q: 7,
-          drive: M.boss ? 2.5 : 0.8, sub: 0.5, bus: A.duckBus });
-      }
-    }
-    /* L1 — hats and percussion: the motion */
-    if (L[1] > 0.01) {
-      if (S.hat[beat] === 'x') hat(t, beat % 8 === 6, A.musicBus, L[1]);
-      if (beat === 14) hit({ at: t, freq: 5200, sweep: 12000, q: 1, dur: 0.12,
-        gain: 0.1 * L[1], filterType: 'bandpass', verb: 0.4, bus: A.musicBus });
-    }
-    /* L2 — the hook: plucked, through the delay */
-    if (L[2] > 0.01) {
-      var m2 = S.motif[beat % 8];
-      if (beat % 2 === 0 || beat % 8 === 3 || beat % 8 === 7) {
-        synth({ at: t, freq: note(m2, 1), type: 'square', dur: 0.15, gain: 0.22 * L[2],
-          cutoff: 4200, q: 2, verb: 0.25, echo: 0.35, bus: A.duckBus });
-        synth({ at: t, freq: note(m2, 2), type: 'triangle', dur: 0.12, gain: 0.09 * L[2],
-          cutoff: 7000, verb: 0.3, bus: A.duckBus });
-      }
-    }
-    /* L3 — supersaw pad and counter-lead: full flight */
-    if (L[3] > 0.01) {
-      if (beat === 0 || beat === 8) {
-        var chord = [0, 2, 4];
-        chord.forEach(function (d, i) {
-          synth({ at: t, freq: note(d + (beat === 8 ? 1 : 0), 0), type: 'sawtooth',
-            voices: 5, spread: 16, atk: 0.12, hold: 0.5, dur: 1.1,
-            gain: 0.055 * L[3], cutoff: 1800 + i * 400, verb: 0.7, bus: A.duckBus });
+    /* ── TONE (always, from the first layer) ───────────────────────────────
+       The pad holds the chord for two full bars; the bass sustains under it. */
+    if (L[0] > 0.01 && beat === 0) {
+      if (bar % 2 === 0) {
+        [0, 2, 4].forEach(function (d, i) {
+          synth({ at: t, freq: note(root + d, 0), type: 'sawtooth', voices: 5, spread: 15,
+            atk: 0.35, hold: barSecs * 1.5, dur: 0.9, gain: 0.075 * L[0],
+            cutoff: 1500 + i * 350, verb: 0.75, bus: A.duckBus });
         });
       }
-      if (beat % 4 === 3) {
-        synth({ at: t, freq: note(S.motif[(beat + 3) % 8] + 4, 2), type: 'triangle',
-          dur: 0.28, gain: 0.075 * L[3], cutoff: 6000, verb: 0.4, echo: 0.4, bus: A.duckBus });
+      synth({ at: t, freq: note(root, -2), type: 'sawtooth', voices: 2, spread: 7,
+        atk: 0.02, hold: barSecs * 0.72, dur: 0.35, gain: 0.3 * L[0],
+        cutoff: M.boss ? 480 : 400, q: 5, drive: M.boss ? 2 : 0.6, sub: 0.6, bus: A.duckBus });
+    }
+    /* the off-beat bass push, long enough to be a note rather than a tick */
+    if (L[0] > 0.01 && (beat === 6 || beat === 10 || beat === 14)) {
+      synth({ at: t, freq: note(root + (beat === 10 ? 4 : 0), -2), type: 'sawtooth',
+        voices: 2, spread: 7, atk: 0.012, hold: 0.1, dur: 0.24, gain: 0.22 * L[0],
+        cutoff: 420, q: 5, sub: 0.5, bus: A.duckBus });
+    }
+
+    /* ── DRUMS: quieter, and never the loudest thing in the mix ── */
+    if (L[0] > 0.01) {
+      if (S.kick[beat] === 'x') { kick(t, A.musicBus, L[0] * 0.85); duck(t); }
+      if (S.snare[beat] === 'x') (M.boss ? snare : clap)(t, A.musicBus, L[0] * 0.55);
+    }
+    if (L[1] > 0.01 && S.hat[beat] === 'x') {
+      hat(t, beat % 8 === 6, A.musicBus, L[1] * 0.5);
+    }
+
+    /* ── MELODY: an eight-bar phrase with rests, over the progression ── */
+    if (L[2] > 0.01) {
+      var phrase = S.motif;
+      var idx = (bar * 4 + Math.floor(beat / 4)) % 8;
+      if (beat % 4 === 0 && !(bar % 4 === 3 && beat >= 8)) {      // rest at the phrase end
+        synth({ at: t, freq: note(root + phrase[idx], 1), type: 'triangle', voices: 2,
+          spread: 6, atk: 0.012, hold: 0.12, dur: 0.4, gain: 0.19 * L[2],
+          cutoff: 5200, verb: 0.4, echo: 0.3, bus: A.duckBus });
+      }
+      if (beat % 8 === 6) {                                        // an answering note
+        synth({ at: t, freq: note(root + phrase[(idx + 2) % 8], 1), type: 'square',
+          atk: 0.01, dur: 0.2, gain: 0.1 * L[2], cutoff: 3600, echo: 0.35, bus: A.duckBus });
       }
     }
 
-    /* section furniture: a riser into every 8th bar, an impact when it lands */
+    /* ── FULL FLIGHT: counter-melody, wide pad octave, claps ── */
+    if (L[3] > 0.01) {
+      if (beat % 2 === 0) {
+        synth({ at: t, freq: note(root + S.motif[(beat / 2 + bar) % 8] + 2, 2), type: 'triangle',
+          atk: 0.008, dur: 0.16, gain: 0.07 * L[3], cutoff: 7000, verb: 0.4, echo: 0.4,
+          bus: A.duckBus });
+      }
+      if (beat === 0 && bar % 2 === 0) {
+        [0, 4].forEach(function (d) {
+          synth({ at: t, freq: note(root + d, 1), type: 'sawtooth', voices: 4, spread: 20,
+            atk: 0.5, hold: barSecs, dur: 1.2, gain: 0.05 * L[3], cutoff: 2600,
+            verb: 0.8, bus: A.duckBus });
+        });
+      }
+      if (beat === 4 || beat === 12) clap(t, A.musicBus, L[3] * 0.5);
+    }
+
+    /* section furniture */
     if (beat === 0) {
       for (var i = 0; i < 4; i++) {
         var want = M.target > i ? 1 : 0;
         M.layer[i] += (want - M.layer[i]) * (want ? 1 : 0.45);
         if (M.layer[i] < 0.02) M.layer[i] = 0;
       }
-      if (bar === 7 && M.target >= 2) riser(t + (60 / M.bpm) * 2, (60 / M.bpm) * 2, A.musicBus);
-      if (bar % 4 === 3) {                       // a fill, so the loop never sits still
-        var sp = 60 / M.bpm / 4;
-        for (var f = 0; f < 6; f++) {
-          snare(t + (12 + f * 0.6) * sp, A.musicBus, 0.5 + f * 0.09);
-        }
-      }
+      if (bar === 7 && M.target >= 2) riser(t + barSecs * 0.5, barSecs * 0.5, A.musicBus);
       if (bar === 0 && M.target >= 3) impact(t, A.musicBus);
     }
   }
@@ -360,7 +398,7 @@
     if (!M.playing || !A.ctx) return;
     var spb = 60 / M.bpm / 4;
     var budget = 64;        // never block the thread if the clock jumped
-    while (M.next < A.ctx.currentTime + 0.18 && budget-- > 0) {
+    while (M.next < A.ctx.currentTime + 0.28 && budget-- > 0) {
       try { scheduleStep(M.step, M.next); }
       catch (e) { /* one bad step must never silence the whole score */ }
       M.step = (M.step + 1) % 128;
@@ -628,6 +666,92 @@
       synth({ at: t + i * 0.2, freq: 330 * Math.pow(2, s / 12), type: 'sawtooth', voices: 3,
         dur: 0.8, gain: 0.12, cutoff: 1400, verb: 0.6 });
     });
+  };
+
+  /* ── a deeper effects bench ─────────────────────────────────────────── */
+
+  /** Tile picked up. */
+  A.select = function () {
+    A.init();
+    synth({ freq: 620, type: 'sine', atk: 0.004, dur: 0.09, gain: 0.11, cutoff: 5000, verb: 0.2 });
+    hit({ freq: 3200, q: 5, dur: 0.02, gain: 0.05, filterType: 'bandpass' });
+  };
+  /** A gem lands after falling. Pitched by how far it fell. */
+  A.land = function (distance) {
+    A.init();
+    var f = 240 - Math.min(90, (distance || 1) * 10);
+    synth({ freq: f, type: 'sine', atk: 0.003, dur: 0.07, gain: 0.05, cutoff: 1200 });
+  };
+  /** Fog burned off a tile. */
+  A.fogClear = function () {
+    A.init();
+    hit({ freq: 900, sweep: 5200, q: 1.4, dur: 0.24, gain: 0.14, filterType: 'bandpass', verb: 0.5 });
+  };
+  /** Armour cracks. */
+  A.armor = function () {
+    A.init();
+    hit({ freq: 2600, sweep: 700, q: 2.4, dur: 0.1, gain: 0.16, filterType: 'bandpass' });
+    synth({ freq: 300, glide: 180, type: 'square', dur: 0.08, gain: 0.1, cutoff: 2200, drive: 2 });
+  };
+  /** Infection cleaned off a neighbour. */
+  A.cleanse = function () {
+    A.init();
+    synth({ freq: 700, glide: 1300, type: 'sine', atk: 0.006, dur: 0.18, gain: 0.1,
+      cutoff: 6000, verb: 0.4, echo: 0.2 });
+  };
+  /** A case file reaches the bottom. */
+  A.deliver = function () {
+    A.init(); if (!A.ctx) return;
+    var t = A.ctx.currentTime;
+    [0, 4, 9].forEach(function (n, i) {
+      synth({ at: t + i * 0.06, freq: 523 * Math.pow(2, n / 12), type: 'triangle',
+        dur: 0.3, gain: 0.15, cutoff: 7000, verb: 0.5, echo: 0.25 });
+    });
+    hit({ at: t, freq: 3000, sweep: 8000, q: 1, dur: 0.2, gain: 0.08, filterType: 'bandpass' });
+  };
+  /** A tool is armed and waiting for a target. */
+  A.arm = function () {
+    A.init();
+    synth({ freq: 420, glide: 880, type: 'sawtooth', voices: 2, atk: 0.006, dur: 0.16,
+      gain: 0.12, cutoff: 3400, verb: 0.3 });
+  };
+  /** A curve ball lands. */
+  A.event = function (good) {
+    A.init(); if (!A.ctx) return;
+    var t = A.ctx.currentTime;
+    if (good) {
+      [0, 5, 9, 12].forEach(function (n, i) {
+        synth({ at: t + i * 0.055, freq: 392 * Math.pow(2, n / 12), type: 'triangle',
+          dur: 0.34, gain: 0.14, cutoff: 7000, verb: 0.6, echo: 0.3 });
+      });
+      riser(t, 0.45, A.sfxBus);
+    } else {
+      synth({ at: t, freq: 220, glide: 120, type: 'sawtooth', voices: 3, dur: 0.5,
+        gain: 0.16, cutoff: 900, drive: 2.5, verb: 0.5 });
+      hit({ at: t, freq: 600, sweep: 120, dur: 0.45, gain: 0.16, filterType: 'lowpass', verb: 0.4 });
+    }
+  };
+  /** A level begins. */
+  A.levelStart = function () {
+    A.init(); if (!A.ctx) return;
+    var t = A.ctx.currentTime;
+    riser(t, 0.6, A.sfxBus);
+    impact(t + 0.6, A.sfxBus);
+  };
+  /** A rank promotion. */
+  A.rankUp = function () {
+    A.init(); if (!A.ctx) return;
+    var t = A.ctx.currentTime;
+    [0, 7, 12, 16, 19].forEach(function (n, i) {
+      synth({ at: t + i * 0.08, freq: 330 * Math.pow(2, n / 12), type: 'sawtooth', voices: 4,
+        spread: 18, atk: 0.02, hold: 0.1, dur: 0.7, gain: 0.12, cutoff: 5000, verb: 0.8 });
+    });
+  };
+  /** Menu navigation, softer than a gameplay tap. */
+  A.nav = function (back) {
+    A.init();
+    synth({ freq: back ? 520 : 700, glide: back ? 380 : 940, type: 'sine',
+      atk: 0.004, dur: 0.11, gain: 0.09, cutoff: 5200, verb: 0.25 });
   };
 
   /* ═══════════════════ the voice cast ═══════════════════ */
